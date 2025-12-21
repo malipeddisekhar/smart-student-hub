@@ -5,6 +5,14 @@ const backendUrl = import.meta.env.VITE_API_URL;
 
 const AcademicCertificatesNew = ({ studentData }) => {
   const navigate = useNavigate();
+  const backendBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || '';
+  const getFullUrl = (url) => {
+    if (!url) return '';
+    const s = String(url);
+    if (/^https?:\/\//i.test(s) || s.startsWith('data:') || s.startsWith('blob:')) return s;
+    if (s.startsWith('/')) return backendBase.replace(/\/$/, '') + s;
+    return s;
+  };
   const [certificates, setCertificates] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
@@ -157,7 +165,7 @@ const AcademicCertificatesNew = ({ studentData }) => {
         return (
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,application/pdf"
             onChange={(e) => setFormData({...formData, image: e.target.files[0]})}
             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
             required
@@ -368,13 +376,37 @@ const AcademicCertificatesNew = ({ studentData }) => {
             </span>
           </div>
           
-          {cert.image && (
-            <img 
-              src={`${cert.image}`}
-              alt={cert.certificateName}
-              className="w-full h-32 object-cover rounded-lg mb-4"
-            />
-          )}
+          {cert.image && (() => {
+            const isPdf = /\.pdf(\?.*)?$/i.test(String(cert.image));
+            if (isPdf) {
+              return (
+                <div className="w-full h-32 flex items-center justify-center bg-gray-100 rounded-lg mb-4 overflow-hidden">
+                  <a href={getFullUrl(cert.image)} target="_blank" rel="noopener noreferrer" className="w-full h-full block">
+                    <object
+                      data={getFullUrl(cert.image)}
+                      type="application/pdf"
+                      className="w-full h-full"
+                      aria-label={cert.certificateName + " PDF preview"}
+                    >
+                      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                        <svg className="w-10 h-10 text-red-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                          <path d="M6 2h7l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
+                          <path d="M13 3v5h5" />
+                        </svg>
+                      </div>
+                    </object>
+                  </a>
+                </div>
+              );
+            }
+            return (
+              <img 
+                src={getFullUrl(cert.image)}
+                alt={cert.certificateName}
+                className="w-full h-32 object-cover rounded-lg mb-4"
+              />
+            );
+          })()}
           
           <h3 className="text-lg font-bold text-gray-800 mb-2">{cert.certificateName}</h3>
           <p className="text-sm text-gray-600 mb-2">Issued by: {cert.issuedBy}</p>
@@ -519,14 +551,33 @@ const AcademicCertificatesNew = ({ studentData }) => {
               </div>
 
               {/* Right side - Certificate image */}
-              <div className="w-1/2 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center p-8">
-                {selectedCertificate.image ? (
-                  <img 
-                    src={`${selectedCertificate.image}`}
-                    alt={selectedCertificate.certificateName}
-                    className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
-                  />
-                ) : (
+                <div className="w-1/2 bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center p-8">
+                {selectedCertificate.image ? (() => {
+                  const isPdf = /\.pdf(\?.*)?$/i.test(String(selectedCertificate.image));
+                    if (isPdf) {
+                    return (
+                      <object
+                        data={getFullUrl(selectedCertificate.image)}
+                        type="application/pdf"
+                        className="max-w-full max-h-full rounded-lg shadow-lg"
+                        style={{ width: '100%', height: '100%' }}
+                      >
+                        <div className="w-full h-full flex items-center justify-center">
+                          <a href={getFullUrl(selectedCertificate.image)} target="_blank" rel="noopener noreferrer" className="text-sm text-red-600 font-medium">
+                            Open PDF in new tab
+                          </a>
+                        </div>
+                      </object>
+                    );
+                  }
+                  return (
+                    <img 
+                      src={getFullUrl(selectedCertificate.image)}
+                      alt={selectedCertificate.certificateName}
+                      className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                    />
+                  );
+                })() : (
                   <div className="text-center">
                     <div className="w-24 h-24 bg-gray-300 rounded-full flex items-center justify-center mx-auto mb-4">
                       <svg className="w-12 h-12 text-gray-500" fill="currentColor" viewBox="0 0 20 20">

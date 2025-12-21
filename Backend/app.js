@@ -12,6 +12,7 @@ const Admin = require("./models/Admin");
 const College = require("./models/College");
 const Group = require("./models/Group");
 const Message = require("./models/Message");
+const { OAuth2Client } = require('google-auth-library');
 
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -24,6 +25,20 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
+// Helper: ensure we return a usable delivery URL for Cloudinary assets
+const resolveCloudinaryUrl = (val) => {
+  if (!val) return '';
+  const s = String(val);
+  // already an absolute URL
+  if (/^https?:\/\//i.test(s) || s.startsWith('data:') || s.startsWith('blob:')) return s;
+  try {
+    // treat stored value as public_id (or path) and generate a secure URL
+    return cloudinary.url(s, { resource_type: 'auto', secure: true });
+  } catch (e) {
+    return s;
+  }
+};
+
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -33,10 +48,12 @@ const storage = new CloudinaryStorage({
   params: {
     folder: "student-hub-uploads", // any folder name you like
     allowed_formats: ["jpg", "jpeg", "png", "pdf"],
+    resource_type: 'auto',
   },
 });
 const upload = multer({ storage });
 
+<<<<<<< HEAD
 // (Deprecated) Local disk storage for personal certificates - replaced by Cloudinary
 // Keeping the definitions commented for reference. All personal certs now use Cloudinary `upload`.
 // const personalStorage = multer.diskStorage({
@@ -47,6 +64,17 @@ const upload = multer({ storage });
 //   },
 // });
 // const personalUpload = multer({ storage: personalStorage });
+=======
+// Disk storage for personal certificates
+const personalStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+const personalUpload = multer({ storage: personalStorage });
+>>>>>>> 5fc0ddf (Updated backend and frontend components, added Google Sign-In)
 
 
 // Connect to MongoDB
@@ -66,6 +94,42 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Google OAuth2 client for ID token verification
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// Endpoint to verify Google ID token and check user existence
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { id_token, role } = req.body;
+    if (!id_token) return res.status(400).json({ error: 'id_token required' });
+
+    const ticket = await googleClient.verifyIdToken({ idToken: id_token, audience: process.env.GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload(); // email, name, sub, picture, etc.
+
+    const email = payload.email;
+    if (!email) return res.status(400).json({ error: 'Unable to determine email from token' });
+
+    if (role === 'teacher') {
+      const teacher = await Teacher.findOne({ email });
+      if (teacher) {
+        return res.json({ ok: true, type: 'teacher', teacherId: teacher.teacherId, name: teacher.name, email });
+      }
+      return res.json({ ok: true, type: 'none', payload });
+    }
+
+    // default: student role
+    const student = await Student.findOne({ email });
+    if (student) {
+      return res.json({ ok: true, type: 'student', studentId: student.studentId, name: student.name, email });
+    }
+
+    return res.json({ ok: true, type: 'none', payload });
+  } catch (error) {
+    console.error('Google token verification failed', error);
+    res.status(400).json({ error: 'Invalid token' });
+  }
+});
 
 
 // ---------------------
@@ -266,7 +330,7 @@ app.post("/api/academic-certificates", upload.single("image"), async (req, res) 
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: "Student not found" });
 
-    const imageUrl = req.file?.path || req.body.image;
+    const imageUrl = req.file?.path || req.file?.secure_url || req.file?.url || req.body.image;
 
     // Safe skills parsing
     let skillsArr = [];
@@ -304,7 +368,11 @@ app.get("/api/academic-certificates/:studentId", async (req, res) => {
     const { studentId } = req.params;
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: "Student not found" });
-    res.json(student.academicCertificates || []);
+    const certs = (student.academicCertificates || []).map(c => ({
+      ...c,
+      image: resolveCloudinaryUrl(c.image),
+    }));
+    res.json(certs);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -459,7 +527,7 @@ app.get("/api/certificates/:studentId", async (req, res) => {
     const certificates = (student.personalCertificates || []).map(cert => ({
       _id: cert._id,
       name: cert.name,
-      image: cert.image || "",        // Cloudinary URL
+      image: resolveCloudinaryUrl(cert.image) || "",        // Cloudinary URL
       url: cert.url || "",
       date: cert.date || "",
       category: cert.category || "",
@@ -472,6 +540,7 @@ app.get("/api/certificates/:studentId", async (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 app.post(
   "/api/certificates",
   (req, res, next) => {
@@ -485,13 +554,20 @@ app.post(
     });
   },
   async (req, res) => {
+=======
+app.post("/api/certificates", personalUpload.single("image"), async (req, res) => {
+>>>>>>> 5fc0ddf (Updated backend and frontend components, added Google Sign-In)
   try {
     const { studentId, name, url, date, category, issuer } = req.body;
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: "Student not found" });
 
+<<<<<<< HEAD
     // Use Cloudinary URL when a file is uploaded; fallback to provided image URL
     const imageUrl = req.file?.path || req.body.image;
+=======
+    const imageUrl = req.file ? `/uploads/${req.file.filename}` : req.body.image;
+>>>>>>> 5fc0ddf (Updated backend and frontend components, added Google Sign-In)
 
     const newCert = {
       name,
@@ -509,7 +585,10 @@ app.post(
 
     res.status(201).json({ message: "Certificate added", certificate: newCert });
   } catch (error) {
+<<<<<<< HEAD
     console.error("❌ Personal certificate save error:", error);
+=======
+>>>>>>> 5fc0ddf (Updated backend and frontend components, added Google Sign-In)
     res.status(400).json({ error: error.message });
   }
 });

@@ -2,6 +2,14 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 const backendUrl = import.meta.env.VITE_API_URL;
+  const backendBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || '';
+  const getFullUrl = (url) => {
+    if (!url) return '';
+    const s = String(url);
+    if (/^https?:\/\//i.test(s) || s.startsWith('data:') || s.startsWith('blob:')) return s;
+    if (s.startsWith('/')) return backendBase.replace(/\/$/, '') + s;
+    return s;
+  };
 const TeacherDashboard = ({ teacherData, onLogout }) => {
   const navigate = useNavigate();
   const [backendStatus, setBackendStatus] = useState("Connecting...");
@@ -794,33 +802,59 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
                                 >
                                   <div className="flex gap-6">
-                                    {cert.image && cert.image !== "" && (
-                                      <div className="flex-shrink-0">
-                                        <div className="relative group">
-                                          <img
-                                            src={cert.image}
-                                            alt={cert.name}
-                                            className="w-32 h-32 object-cover rounded-xl border-2 border-gray-200 cursor-pointer group-hover:border-blue-400 transition-all duration-300"
-                                            onClick={() => {
-                                              setSelectedImage(cert.image);
-                                              setShowImagePopup(true);
-                                            }}
-                                            onError={(e) => {
-                                              console.log(
-                                                "Image failed to load:",
-                                                cert.image
-                                              );
-                                              e.target.style.display = "none";
-                                            }}
-                                            onLoad={(e) => {
-                                              console.log(
-                                                "Image loaded successfully"
-                                              );
-                                            }}
-                                          />
-                                        </div>
-                                      </div>
-                                    )}
+                                    {cert.image && cert.image !== "" && (() => {
+                                        const src = cert.image || '';
+                                        const full = getFullUrl(src);
+                                        const isPdf = /\.pdf(\?.*)?$/i.test(String(src));
+                                        if (isPdf) {
+                                          return (
+                                            <div className="flex-shrink-0">
+                                              <div
+                                                className="relative group w-32 h-32 rounded-xl border-2 border-gray-200 overflow-hidden cursor-pointer"
+                                                onClick={() => {
+                                                  setSelectedImage(full);
+                                                  setShowImagePopup(true);
+                                                }}
+                                              >
+                                                <object
+                                                  data={full}
+                                                  type="application/pdf"
+                                                  className="w-full h-full"
+                                                >
+                                                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                                    <svg className="w-10 h-10 text-red-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                                                      <path d="M6 2h7l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
+                                                      <path d="M13 3v5h5" />
+                                                    </svg>
+                                                  </div>
+                                                </object>
+                                              </div>
+                                            </div>
+                                          );
+                                        }
+                                        return (
+                                          <div className="flex-shrink-0">
+                                            <div className="relative group">
+                                              <img
+                                                src={getFullUrl(cert.image)}
+                                                alt={cert.name}
+                                                className="w-32 h-32 object-cover rounded-xl border-2 border-gray-200 cursor-pointer group-hover:border-blue-400 transition-all duration-300"
+                                                onClick={() => {
+                                                  setSelectedImage(getFullUrl(cert.image));
+                                                  setShowImagePopup(true);
+                                                }}
+                                                onError={(e) => {
+                                                  console.log(
+                                                    "Image failed to load:",
+                                                    cert.image
+                                                  );
+                                                  e.target.style.display = "none";
+                                                }}
+                                              />
+                                            </div>
+                                          </div>
+                                        );
+                                    })()}
                                     <div className="flex-1">
                                       <h5 className="text-xl font-bold text-gray-800 mb-3">
                                         {cert.name}
@@ -1458,20 +1492,25 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                               View URL
                             </a>
                           )}
-                          {cert.image && (
-                            <button
-                              onClick={() => {
-                                  setSelectedImage(`${cert.image}`);
-                                   setShowImagePopup(true);
-                              }}
-                              className="inline-flex items-center bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
-                            >
-                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd"/>
-                              </svg>
-                              View Image
-                            </button>
-                          )}
+                          {cert.image && (() => {
+                            const src = cert.image || '';
+                            const full = getFullUrl(src);
+                            const isPdf = /\.pdf(\?.*)?$/i.test(String(src));
+                            return (
+                              <button
+                                onClick={() => {
+                                  setSelectedImage(full);
+                                  setShowImagePopup(true);
+                                }}
+                                className="inline-flex items-center bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors"
+                              >
+                                <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd"/>
+                                </svg>
+                                {isPdf ? 'View PDF' : 'View Image'}
+                              </button>
+                            );
+                          })()}
                         </div>
                         
                         <div className="flex gap-2">
@@ -1554,11 +1593,33 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
               </button>
             </div>
             <div className="flex justify-center">
-              <img
-                src={selectedImage}
-                alt="Certificate"
-                className="max-w-full max-h-96 object-contain rounded-xl shadow-lg"
-              />
+              {(() => {
+                const src = selectedImage || '';
+                const isPdf = /\.pdf(\?.*)?$/i.test(String(src));
+                if (isPdf) {
+                  return (
+                    <object
+                      data={src}
+                      type="application/pdf"
+                      className="max-w-full max-h-96 rounded-xl shadow-lg"
+                      style={{ width: '100%', height: '100%' }}
+                    >
+                      <div className="w-full h-full flex items-center justify-center">
+                        <a href={src} target="_blank" rel="noopener noreferrer" className="text-sm text-red-600 font-medium">
+                          Open PDF in new tab
+                        </a>
+                      </div>
+                    </object>
+                  );
+                }
+                return (
+                  <img
+                    src={src}
+                    alt="Certificate"
+                    className="max-w-full max-h-96 object-contain rounded-xl shadow-lg"
+                  />
+                );
+              })()}
             </div>
           </div>
         </div>

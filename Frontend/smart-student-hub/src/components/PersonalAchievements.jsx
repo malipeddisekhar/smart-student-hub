@@ -96,12 +96,21 @@ const PersonalAchievements = ({ studentData }) => {
   };
 
   const downloadCertificate = (certificate) => {
-    const link = document.createElement('a');
-    link.href = certificate.image;
-    link.download = `${certificate.name}.jpg`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const link = document.createElement('a');
+      const raw = certificate.image || '';
+      const url = /^https?:\/\//i.test(raw) || raw.startsWith('/') ? (api.defaults.baseURL ? api.defaults.baseURL.replace(/\/$/, '') + (raw.startsWith('/') ? raw : '/' + raw) : raw) : raw;
+      const extMatch = String(raw).split('.').pop().split(/[#?]/)[0];
+      const ext = extMatch && extMatch.length < 6 ? extMatch : 'pdf';
+      const filename = `${certificate.name.replace(/\s+/g, '_')}.${ext}`;
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.error('Download failed', e);
+    }
   };
 
   return (
@@ -145,7 +154,7 @@ const PersonalAchievements = ({ studentData }) => {
               <input
                 type="file"
                 name="image"
-                accept=".jpg,.jpeg,.png,.pdf"
+                accept=".jpg,.jpeg,.png,.pdf,application/pdf,image/*"
                 onChange={handleChange}
                 className="w-full p-2 border rounded"
                 required
@@ -213,11 +222,43 @@ const PersonalAchievements = ({ studentData }) => {
                 ×
               </button>
               <div onClick={() => setSelectedCertificate(cert)}>
-                <img
-                  src={cert.image}
-                  alt={cert.name}
-                  className="w-full h-48 object-cover rounded mb-4"
-                />
+                {(() => {
+                    const src = cert.image || '';
+                    const isPdf = /\.pdf(\?.*)?$/i.test(String(src));
+                    const full = (() => {
+                      if (!src) return '';
+                      if (/^https?:\/\//i.test(src) || src.startsWith('data:') || src.startsWith('blob:')) return src;
+                      return (api.defaults.baseURL || import.meta.env.VITE_API_URL || '').replace(/\/$/, '') + (src.startsWith('/') ? src : '/' + src);
+                    })();
+                    if (isPdf) {
+                      return (
+                        <div className="w-full h-48 flex items-center justify-center bg-gray-100 rounded mb-4 overflow-hidden">
+                          <a href={full} target="_blank" rel="noopener noreferrer" className="w-full h-full block">
+                            <object
+                              data={full}
+                              type="application/pdf"
+                              className="w-full h-full"
+                              aria-label={cert.name + " PDF preview"}
+                            >
+                              <div className="w-full h-full flex items-center justify-center bg-gray-100">
+                                <svg className="w-10 h-10 text-red-600" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+                                  <path d="M6 2h7l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
+                                  <path d="M13 3v5h5" />
+                                </svg>
+                              </div>
+                            </object>
+                          </a>
+                        </div>
+                      );
+                    }
+                    return (
+                      <img
+                        src={full}
+                        alt={cert.name}
+                        className="w-full h-48 object-cover rounded mb-4"
+                      />
+                    );
+                  })()}
                 <h3 className="font-semibold text-lg mb-2">{cert.name}</h3>
                 <p className="text-gray-600 mb-1">Category: {cert.category}</p>
                 <p className="text-gray-600 mb-1">Issued by: {cert.issuer}</p>
@@ -272,11 +313,38 @@ const PersonalAchievements = ({ studentData }) => {
                   </button>
                 </div>
                 <div className="flex-1">
-                  <img
-                    src={selectedCertificate.image}
-                    alt={selectedCertificate.name}
-                    className="w-full h-96 object-cover rounded-xl shadow-lg"
-                  />
+                  {(() => {
+                    const src = selectedCertificate.image || '';
+                    const isPdf = /\.pdf(\?.*)?$/i.test(String(src));
+                    const full = (() => {
+                      if (!src) return '';
+                      if (/^https?:\/\//i.test(src) || src.startsWith('data:') || src.startsWith('blob:')) return src;
+                      return (api.defaults.baseURL || import.meta.env.VITE_API_URL || '').replace(/\/$/, '') + (src.startsWith('/') ? src : '/' + src);
+                    })();
+                    if (isPdf) {
+                      return (
+                        <object
+                          data={full}
+                          type="application/pdf"
+                          className="w-full h-96 rounded-xl shadow-lg"
+                          style={{ width: '100%', height: '100%' }}
+                        >
+                          <div className="w-full h-full flex items-center justify-center">
+                            <a href={full} target="_blank" rel="noopener noreferrer" className="text-sm text-red-600 font-medium">
+                              Open PDF in new tab
+                            </a>
+                          </div>
+                        </object>
+                      );
+                    }
+                    return (
+                      <img
+                        src={full}
+                        alt={selectedCertificate.name}
+                        className="w-full h-96 object-cover rounded-xl shadow-lg"
+                      />
+                    );
+                  })()}
                 </div>
               </div>
             </div>

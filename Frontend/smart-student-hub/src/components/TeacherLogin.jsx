@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -27,6 +27,65 @@ const TeacherLogin = ({ onLogin }) => {
       setError(error.response?.data?.error || 'Login failed');
     }
   };
+
+  // Google Sign-In
+  useEffect(() => {
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    const loadScript = () => {
+      if (document.getElementById('google-client-script')) return Promise.resolve();
+      return new Promise((resolve) => {
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.id = 'google-client-script';
+        s.async = true;
+        s.defer = true;
+        s.onload = resolve;
+        document.body.appendChild(s);
+      });
+    };
+
+    const parseJwt = (token) => {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+      } catch (e) {
+        return null;
+      }
+    };
+
+    loadScript().then(() => {
+      /* global google */
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        window.google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (resp) => {
+            const payload = parseJwt(resp.credential);
+            if (payload) {
+              const user = {
+                teacherId: payload.sub,
+                name: payload.name,
+                email: payload.email,
+                picture: payload.picture,
+                provider: 'google'
+              };
+              onLogin(user);
+              navigate('/teacher/dashboard');
+            }
+          }
+        });
+        window.google.accounts.id.renderButton(
+          document.getElementById('googleSignInDivTeacher'),
+          { theme: 'outline', size: 'large', width: '100%' }
+        );
+      }
+    });
+  }, [onLogin, navigate]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center">
@@ -91,6 +150,13 @@ const TeacherLogin = ({ onLogin }) => {
               Register here
             </button>
           </p>
+          <div className="mt-4">
+            {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
+              <div id="googleSignInDivTeacher" className="flex justify-center"></div>
+            ) : (
+              <div className="text-sm text-gray-500">Set VITE_GOOGLE_CLIENT_ID in your .env to enable Google Sign-In</div>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 text-center">

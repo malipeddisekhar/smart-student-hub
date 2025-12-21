@@ -32,9 +32,9 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedStudentData = localStorage.getItem("studentData");
-    const savedTeacherData = localStorage.getItem("teacherData");
-    const savedAdminData = localStorage.getItem("adminData");
+    const savedStudentData = sessionStorage.getItem("studentData");
+    const savedTeacherData = sessionStorage.getItem("teacherData");
+    const savedAdminData = sessionStorage.getItem("adminData");
     if (savedStudentData) {
       setStudentData(JSON.parse(savedStudentData));
     }
@@ -49,32 +49,32 @@ function App() {
 
   const handleLogin = (data) => {
     setStudentData(data);
-    localStorage.setItem("studentData", JSON.stringify(data));
+    sessionStorage.setItem("studentData", JSON.stringify(data));
   };
 
   const handleTeacherLogin = (data) => {
     setTeacherData(data);
-    localStorage.setItem("teacherData", JSON.stringify(data));
+    sessionStorage.setItem("teacherData", JSON.stringify(data));
   };
 
   const handleLogout = () => {
     setStudentData(null);
-    localStorage.removeItem("studentData");
+    sessionStorage.removeItem("studentData");
   };
 
   const handleTeacherLogout = () => {
     setTeacherData(null);
-    localStorage.removeItem("teacherData");
+    sessionStorage.removeItem("teacherData");
   };
 
   const handleAdminLogin = (data) => {
     setAdminData(data);
-    localStorage.setItem("adminData", JSON.stringify(data));
+    sessionStorage.setItem("adminData", JSON.stringify(data));
   };
 
   const handleAdminLogout = () => {
     setAdminData(null);
-    localStorage.removeItem("adminData");
+    sessionStorage.removeItem("adminData");
   };
 
   if (isLoading) {
