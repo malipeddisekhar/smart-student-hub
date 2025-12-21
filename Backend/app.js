@@ -732,5 +732,20 @@ app.delete('/api/projects/:studentId/:projectId', async (req, res) => {
   }
 });
 
+// Return full student record (used by frontend view profile)
+app.get('/api/students/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findOne({ studentId }).lean();
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    // Remove sensitive fields
+    const { password, __v, ...rest } = student;
+    res.json(rest);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 
 app.listen(port, () => console.log(`Server running at http://localhost:${port}`));

@@ -208,18 +208,35 @@ const StudentProfile = ({ studentData }) => {
         
         {profile[cert.name] ? (
           <div className="space-y-3">
-            <div className="relative group">
-              <img
-                src={profile[cert.name]} // Directly use Cloudinary URL
-                alt={cert.label}
-                className="w-full h-40 object-cover rounded-xl border-2 border-gray-200 cursor-pointer hover:border-blue-400 transition-all duration-300 group-hover:scale-105"
-                onClick={() =>
-                  setSelectedImage({
-                    src: profile[cert.name],
-                    title: cert.label,
-                  })
-                }
-              />
+            <div className="relative group w-full h-40 bg-gray-50 rounded-xl border-2 border-gray-200 overflow-hidden">
+              {/\.pdf$/i.test(String(profile[cert.name])) ? (
+                <object
+                  data={profile[cert.name]}
+                  type="application/pdf"
+                  className="w-full h-full rounded-xl"
+                >
+                  <a
+                    href={profile[cert.name]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center h-full text-blue-600 font-medium"
+                  >
+                    Open PDF
+                  </a>
+                </object>
+              ) : (
+                <img
+                  src={profile[cert.name]}
+                  alt={cert.label}
+                  className="w-full h-full object-cover rounded-xl cursor-pointer hover:border-blue-400 transition-all duration-300 group-hover:scale-105"
+                  onClick={() =>
+                    setSelectedImage({
+                      src: profile[cert.name],
+                      title: cert.label,
+                    })
+                  }
+                />
+              )}
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 rounded-xl transition-all duration-300 flex items-center justify-center">
                 <svg className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-300" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M3 4a1 1 0 011-1h4a1 1 0 010 2H6.414l2.293 2.293a1 1 0 11-1.414 1.414L5 6.414V8a1 1 0 01-2 0V4zm9 1a1 1 0 010-2h4a1 1 0 011 1v4a1 1 0 01-2 0V6.414l-2.293 2.293a1 1 0 11-1.414-1.414L13.586 5H12zm-9 7a1 1 0 012 0v1.586l2.293-2.293a1 1 0 111.414 1.414L6.414 15H8a1 1 0 010 2H4a1 1 0 01-1-1v-4zm13-1a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 010-2h1.586l-2.293-2.293a1 1 0 111.414-1.414L15 13.586V12a1 1 0 011-1z" clipRule="evenodd"/>
@@ -243,72 +260,31 @@ const StudentProfile = ({ studentData }) => {
             />
           </div>
         ) : (
-          <input
-            type="file"
-            name={cert.name}
-            accept=".jpg,.jpeg,.png,.pdf"
-            onChange={handleChange}
-            className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => document.getElementById(cert.name).click()}
+              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
+            >
+              Upload Certificate
+            </button>
+            <input
+              id={cert.name}
+              type="file"
+              name={cert.name}
+              accept=".jpg,.jpeg,.png,.pdf"
+              onChange={handleChange}
+              className="hidden"
+            />
+          </div>
         )}
-      </div>
-    ))}
+
+        </div>
+      ))}
+    </div>
   </div>
-</div>
 
-              {/* Social Profiles Section */}
-              <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-8 border border-white/40 shadow-lg">
-                <div className="flex items-center mb-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-600 rounded-xl flex items-center justify-center mr-4">
-                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clipRule="evenodd"/>
-                    </svg>
-                  </div>
-                  <h3 className="text-2xl font-bold text-gray-800">Social Profiles</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">LinkedIn Profile</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.338 16.338H13.67V12.16c0-.995-.017-2.277-1.387-2.277-1.39 0-1.601 1.086-1.601 2.207v4.248H8.014v-8.59h2.559v1.174h.037c.356-.675 1.227-1.387 2.526-1.387 2.703 0 3.203 1.778 3.203 4.092v4.711zM5.005 6.575a1.548 1.548 0 11-.003-3.096 1.548 1.548 0 01.003 3.096zm-1.337 9.763H6.34v-8.59H3.667v8.59zM17.668 1H2.328C1.595 1 1 1.581 1 2.298v15.403C1 18.418 1.595 19 2.328 19h15.34c.734 0 1.332-.582 1.332-1.299V2.298C19 1.581 18.402 1 17.668 1z" clipRule="evenodd"/>
-                        </svg>
-                      </div>
-                      <input
-                        type="url"
-                        name="linkedinProfile"
-                        value={formData.linkedinProfile}
-                        onChange={handleChange}
-                        className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
-                        placeholder="https://linkedin.com/in/username"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <label className="block text-sm font-semibold text-gray-700">GitHub Profile</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <svg className="w-5 h-5 text-gray-800" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 0C4.477 0 0 4.484 0 10.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0110 4.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.203 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.942.359.31.678.921.678 1.856 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0020 10.017C20 4.484 15.522 0 10 0z" clipRule="evenodd"/>
-                        </svg>
-                      </div>
-                      <input
-                        type="url"
-                        name="githubProfile"
-                        value={formData.githubProfile}
-                        onChange={handleChange}
-                        className="w-full pl-12 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
-                        placeholder="https://github.com/username"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="text-center">
+                <div className="text-center">
                 <button
                   type="submit"
                   className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-800 text-white py-4 px-12 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-2xl hover:shadow-3xl"

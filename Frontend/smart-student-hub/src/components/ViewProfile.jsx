@@ -28,10 +28,18 @@ const ViewProfile = ({ studentData }) => {
     try {
       const response = await api.get(`/api/students/${studentData.studentId}`);
       console.log("Full student data from DB:", response.data);
-      console.log("Skills data:", response.data.skills);
+      console.log("College:", response.data.college);
+      console.log("Department:", response.data.department);
+      console.log("Year:", response.data.year);
+      console.log("Semester:", response.data.semester);
+      console.log("Roll Number:", response.data.rollNumber);
       setFullStudentData(response.data);
     } catch (error) {
       console.error("Error fetching student data:", error);
+      // Fallback: use studentData if available
+      if (studentData && (studentData.college || studentData.department)) {
+        setFullStudentData(studentData);
+      }
     }
   };
 
@@ -89,14 +97,14 @@ const ViewProfile = ({ studentData }) => {
             <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-xl">
               <h3 className="font-semibold text-gray-700 mb-2">College</h3>
               <p className="text-emerald-600 font-medium">
-                {fullStudentData.college}
+                {fullStudentData?.college || profile?.college || studentData?.college || '—'}
               </p>
             </div>
 
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl">
               <h3 className="font-semibold text-gray-700 mb-2">Department</h3>
               <p className="text-purple-600 font-medium">
-                {fullStudentData.department}
+                {fullStudentData?.department || profile?.department || studentData?.department || '—'}
               </p>
             </div>
 
@@ -105,14 +113,14 @@ const ViewProfile = ({ studentData }) => {
                 Year & Semester
               </h3>
               <p className="text-orange-600 font-medium">
-                Year {fullStudentData.year}, Semester {fullStudentData.semester}
+                Year {fullStudentData?.year || profile?.year || studentData?.year || '—'}, Semester {fullStudentData?.semester || profile?.semester || studentData?.semester || '—'}
               </p>
             </div>
 
             <div className="bg-gradient-to-r from-cyan-50 to-blue-50 p-4 rounded-xl">
               <h3 className="font-semibold text-gray-700 mb-2">Roll Number</h3>
               <p className="text-cyan-600 font-medium">
-                {fullStudentData.rollNumber}
+                {fullStudentData?.rollNumber || profile?.rollNumber || studentData?.rollNumber || '—'}
               </p>
             </div>
 
@@ -150,72 +158,174 @@ const ViewProfile = ({ studentData }) => {
             {profile.class10Certificate && (
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-xl">
                 <h4 className="font-semibold text-gray-700 mb-2">10th Certificate</h4>
-                <img
-                   src={profile.class10Certificate} 
-                  alt="10th Certificate"
-                  className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => setSelectedImage({ src: profile.class10Certificate, title: "10th Certificate" })}
-                />
+                {/\.pdf$/i.test(String(profile.class10Certificate)) ? (
+                  <object
+                    data={profile.class10Certificate}
+                    type="application/pdf"
+                    className="w-full h-40 rounded-lg"
+                  >
+                    <a
+                      href={profile.class10Certificate}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center h-full text-blue-600 font-medium"
+                    >
+                      Open PDF
+                    </a>
+                  </object>
+                ) : (
+                  <img
+                    src={profile.class10Certificate}
+                    alt="10th Certificate"
+                    className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
+                    onClick={() => setSelectedImage({ src: profile.class10Certificate, title: "10th Certificate" })}
+                  />
+                )}
               </div>
             )}
 
             {profile.class12Certificate && (
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-xl">
                 <h4 className="font-semibold text-gray-700 mb-2">12th Certificate</h4>
-                <img
-                   src={profile.class12Certificate} 
-                  alt="12th Certificate"
-                  className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => setSelectedImage({  src: profile.class12Certificate, title: "12th Certificate" })}
-                />
+                {/\.pdf$/i.test(String(profile.class12Certificate)) ? (
+                  <object
+                    data={profile.class12Certificate}
+                    type="application/pdf"
+                    className="w-full h-40 rounded-lg"
+                  >
+                    <a
+                      href={profile.class12Certificate}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center h-full text-blue-600 font-medium"
+                    >
+                      Open PDF
+                    </a>
+                  </object>
+                ) : (
+                  <img
+                    src={profile.class12Certificate}
+                    alt="12th Certificate"
+                    className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
+                    onClick={() => setSelectedImage({ src: profile.class12Certificate, title: "12th Certificate" })}
+                  />
+                )}
               </div>
             )}
 
             {profile.diplomaCertificate && (
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-4 rounded-xl">
                 <h4 className="font-semibold text-gray-700 mb-2">Diploma Certificate</h4>
-                <img
-                  src={ `${profile.diplomaCertificate}`}
-                  alt="Diploma Certificate"
-                  className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => setSelectedImage({src:profile.diplomaCertificate , title: "Diploma Certificate" })}
-                />
+                {/\.pdf$/i.test(String(profile.diplomaCertificate)) ? (
+                  <object
+                    data={profile.diplomaCertificate}
+                    type="application/pdf"
+                    className="w-full h-40 rounded-lg"
+                  >
+                    <a
+                      href={profile.diplomaCertificate}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center h-full text-blue-600 font-medium"
+                    >
+                      Open PDF
+                    </a>
+                  </object>
+                ) : (
+                  <img
+                    src={profile.diplomaCertificate}
+                    alt="Diploma Certificate"
+                    className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
+                    onClick={() => setSelectedImage({ src: profile.diplomaCertificate, title: "Diploma Certificate" })}
+                  />
+                )}
               </div>
             )}
 
             {profile.bachelorDegree && (
               <div className="bg-gradient-to-r from-orange-50 to-red-50 p-4 rounded-xl">
                 <h4 className="font-semibold text-gray-700 mb-2">Bachelor Degree</h4>
-                <img
-                  src={profile.bachelorDegree}
-                  alt="Bachelor Degree"
-                  className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => setSelectedImage({ src: profile.bachelorDegree, title: "Bachelor Degree" })}
-                />
+                {/\.pdf$/i.test(String(profile.bachelorDegree)) ? (
+                  <object
+                    data={profile.bachelorDegree}
+                    type="application/pdf"
+                    className="w-full h-40 rounded-lg"
+                  >
+                    <a
+                      href={profile.bachelorDegree}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center h-full text-blue-600 font-medium"
+                    >
+                      Open PDF
+                    </a>
+                  </object>
+                ) : (
+                  <img
+                    src={profile.bachelorDegree}
+                    alt="Bachelor Degree"
+                    className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
+                    onClick={() => setSelectedImage({ src: profile.bachelorDegree, title: "Bachelor Degree" })}
+                  />
+                )}
               </div>
             )}
 
             {profile.masterDegree && (
               <div className="bg-gradient-to-r from-cyan-50 to-blue-50 p-4 rounded-xl">
                 <h4 className="font-semibold text-gray-700 mb-2">Master Degree</h4>
-                <img
-                   src={profile.masterDegree} 
-                  alt="Master Degree"
-                  className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => setSelectedImage({ src: profile.masterDegree, title: "Master Degree" })}
-                />
+                {/\.pdf$/i.test(String(profile.masterDegree)) ? (
+                  <object
+                    data={profile.masterDegree}
+                    type="application/pdf"
+                    className="w-full h-40 rounded-lg"
+                  >
+                    <a
+                      href={profile.masterDegree}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center h-full text-blue-600 font-medium"
+                    >
+                      Open PDF
+                    </a>
+                  </object>
+                ) : (
+                  <img
+                    src={profile.masterDegree}
+                    alt="Master Degree"
+                    className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
+                    onClick={() => setSelectedImage({ src: profile.masterDegree, title: "Master Degree" })}
+                  />
+                )}
               </div>
             )}
 
             {profile.doctorDegree && (
               <div className="bg-gradient-to-r from-yellow-50 to-orange-50 p-4 rounded-xl">
                 <h4 className="font-semibold text-gray-700 mb-2">Doctor Degree</h4>
-                <img
-                  src={profile.doctorDegree} 
-                  alt="Doctor Degree"
-                  className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
-                  onClick={() => setSelectedImage({src: profile.doctorDegree, title: "Doctor Degree" })}
-                />
+                {/\.pdf$/i.test(String(profile.doctorDegree)) ? (
+                  <object
+                    data={profile.doctorDegree}
+                    type="application/pdf"
+                    className="w-full h-40 rounded-lg"
+                  >
+                    <a
+                      href={profile.doctorDegree}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center h-full text-blue-600 font-medium"
+                    >
+                      Open PDF
+                    </a>
+                  </object>
+                ) : (
+                  <img
+                    src={profile.doctorDegree}
+                    alt="Doctor Degree"
+                    className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
+                    onClick={() => setSelectedImage({ src: profile.doctorDegree, title: "Doctor Degree" })}
+                  />
+                )}
               </div>
             )}
           </div>
