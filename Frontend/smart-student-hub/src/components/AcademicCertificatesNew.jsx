@@ -62,8 +62,11 @@ const AcademicCertificatesNew = ({ studentData }) => {
   };
 
   useEffect(() => {
-    fetchCertificates();
-  }, []);
+    if (studentData && studentData.studentId) {
+      fetchCertificates();
+    }
+  }, [studentData]);
+
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -77,6 +80,7 @@ const AcademicCertificatesNew = ({ studentData }) => {
   }, []);
 
   const fetchCertificates = async () => {
+    if (!studentData || !studentData.studentId) return;
     try {
       const response = await api.get(`/api/academic-certificates/${studentData.studentId}`);
       setCertificates(response.data);
@@ -352,11 +356,13 @@ const AcademicCertificatesNew = ({ studentData }) => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
   {certificates
-    .filter(cert => 
-      cert.certificateName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      cert.domain.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (cert.skills && cert.skills.some(skill => skill.toLowerCase().includes(searchTerm.toLowerCase())))
-    )
+    .filter(cert => {
+      const term = searchTerm.toLowerCase();
+      const name = (cert.certificateName || '').toString().toLowerCase();
+      const domain = (cert.domain || '').toString().toLowerCase();
+      const skillsMatch = Array.isArray(cert.skills) && cert.skills.some(skill => (skill || '').toString().toLowerCase().includes(term));
+      return name.includes(term) || domain.includes(term) || skillsMatch;
+    })
     .map((cert) => {
       // 👇 Log the image path for debugging
       console.log("cert.image:", cert.image);
