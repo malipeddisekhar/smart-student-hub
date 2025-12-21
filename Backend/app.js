@@ -29,8 +29,8 @@ cloudinary.config({
 const resolveCloudinaryUrl = (val) => {
   if (!val) return '';
   const s = String(val);
-  // already an absolute URL
-  if (/^https?:\/\//i.test(s) || s.startsWith('data:') || s.startsWith('blob:')) return s;
+  // already an absolute URL or a local path (served from /uploads)
+  if (/^https?:\/\//i.test(s) || s.startsWith('/') || s.startsWith('data:') || s.startsWith('blob:')) return s;
   try {
     // treat stored value as public_id (or path) and generate a secure URL
     return cloudinary.url(s, { resource_type: 'auto', secure: true });
@@ -53,18 +53,6 @@ const storage = new CloudinaryStorage({
 });
 const upload = multer({ storage });
 
-<<<<<<< HEAD
-// (Deprecated) Local disk storage for personal certificates - replaced by Cloudinary
-// Keeping the definitions commented for reference. All personal certs now use Cloudinary `upload`.
-// const personalStorage = multer.diskStorage({
-//   destination: (req, file, cb) => cb(null, "uploads/"),
-//   filename: (req, file, cb) => {
-//     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-//     cb(null, uniqueSuffix + path.extname(file.originalname));
-//   },
-// });
-// const personalUpload = multer({ storage: personalStorage });
-=======
 // Disk storage for personal certificates
 const personalStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
@@ -74,7 +62,6 @@ const personalStorage = multer.diskStorage({
   },
 });
 const personalUpload = multer({ storage: personalStorage });
->>>>>>> 5fc0ddf (Updated backend and frontend components, added Google Sign-In)
 
 
 // Connect to MongoDB
@@ -368,10 +355,29 @@ app.get("/api/academic-certificates/:studentId", async (req, res) => {
     const { studentId } = req.params;
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: "Student not found" });
-    const certs = (student.academicCertificates || []).map(c => ({
-      ...c,
-      image: resolveCloudinaryUrl(c.image),
-    }));
+    
+    const certs = (student.academicCertificates || []).map(c => {
+      const certObj = c.toObject ? c.toObject() : c;
+      return {
+        _id: certObj._id,
+        domain: certObj.domain || '',
+        certificateName: certObj.certificateName || '',
+        image: resolveCloudinaryUrl(certObj.image),
+        certificateUrl: certObj.certificateUrl || '',
+        date: certObj.date || '',
+        issuedBy: certObj.issuedBy || '',
+        description: certObj.description || '',
+        skills: certObj.skills || [],
+        duration: certObj.duration || '',
+        location: certObj.location || '',
+        organizationType: certObj.organizationType || '',
+        status: certObj.status || 'pending',
+        feedback: certObj.feedback || '',
+        submittedAt: certObj.submittedAt || '',
+        reviewedAt: certObj.reviewedAt || ''
+      };
+    });
+    
     res.json(certs);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -540,34 +546,13 @@ app.get("/api/certificates/:studentId", async (req, res) => {
   }
 });
 
-<<<<<<< HEAD
-app.post(
-  "/api/certificates",
-  (req, res, next) => {
-    // Handle multer/cloudinary errors explicitly to avoid 500s
-    upload.single("image")(req, res, (err) => {
-      if (err) {
-        console.error("❌ Personal certificate upload error:", err);
-        return res.status(400).json({ error: err.message || "Upload failed" });
-      }
-      next();
-    });
-  },
-  async (req, res) => {
-=======
 app.post("/api/certificates", personalUpload.single("image"), async (req, res) => {
->>>>>>> 5fc0ddf (Updated backend and frontend components, added Google Sign-In)
   try {
     const { studentId, name, url, date, category, issuer } = req.body;
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: "Student not found" });
 
-<<<<<<< HEAD
-    // Use Cloudinary URL when a file is uploaded; fallback to provided image URL
-    const imageUrl = req.file?.path || req.body.image;
-=======
     const imageUrl = req.file ? `/uploads/${req.file.filename}` : req.body.image;
->>>>>>> 5fc0ddf (Updated backend and frontend components, added Google Sign-In)
 
     const newCert = {
       name,
@@ -585,10 +570,7 @@ app.post("/api/certificates", personalUpload.single("image"), async (req, res) =
 
     res.status(201).json({ message: "Certificate added", certificate: newCert });
   } catch (error) {
-<<<<<<< HEAD
     console.error("❌ Personal certificate save error:", error);
-=======
->>>>>>> 5fc0ddf (Updated backend and frontend components, added Google Sign-In)
     res.status(400).json({ error: error.message });
   }
 });
