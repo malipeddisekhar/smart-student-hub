@@ -77,6 +77,14 @@ const ProfessionalPortfolio = ({ studentData }) => {
 
       let yPosition = 60;
 
+      // Simple pagination helper to avoid clipping content
+      const ensureSpace = (needed = 20) => {
+        if (yPosition + needed > 280) {
+          doc.addPage();
+          yPosition = 20;
+        }
+      };
+
       // Profile Image
       if (profileData?.profileImage) {
         try {
@@ -117,6 +125,7 @@ const ProfessionalPortfolio = ({ studentData }) => {
       // Education
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
+      ensureSpace(18);
       doc.text("Education", 20, yPosition);
       yPosition += 10;
 
@@ -134,11 +143,47 @@ const ProfessionalPortfolio = ({ studentData }) => {
       }
       yPosition += 10;
 
+      // Internships
+      const internshipCerts = academicCertificates.filter(
+        (cert) => cert.status === 'approved' && cert.domain === 'internship'
+      );
+      if (internshipCerts.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        ensureSpace(18);
+        doc.text("Internships", 20, yPosition);
+        yPosition += 10;
+
+        internshipCerts.slice(0, 4).forEach((cert, index) => {
+          ensureSpace(24);
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "bold");
+          doc.text(`${index + 1}. ${cert.certificateName}`, 20, yPosition);
+          yPosition += 6;
+
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.text(`Organization: ${cert.issuedBy || 'N/A'}`, 20, yPosition);
+          yPosition += 4;
+          if (cert.date) {
+            doc.text(`Date: ${new Date(cert.date).toLocaleDateString()}`, 20, yPosition);
+            yPosition += 4;
+          }
+          if (cert.description) {
+            const desc = doc.splitTextToSize(cert.description, 170);
+            doc.text(desc, 20, yPosition);
+            yPosition += desc.length * 4;
+          }
+          yPosition += 6;
+        });
+      }
+
       // Technical Skills
       const approvedSkills = Object.keys(skills);
       if (approvedSkills.length > 0) {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
+        ensureSpace(18);
         doc.text("Technical Skills", 20, yPosition);
         yPosition += 10;
 
@@ -154,10 +199,12 @@ const ProfessionalPortfolio = ({ studentData }) => {
       if (projects.length > 0) {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
+        ensureSpace(18);
         doc.text("Projects", 20, yPosition);
         yPosition += 10;
 
         projects.slice(0, 5).forEach((project, index) => {
+          ensureSpace(28);
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
           doc.text(`${index + 1}. ${project.title}`, 20, yPosition);
@@ -186,10 +233,12 @@ const ProfessionalPortfolio = ({ studentData }) => {
       if (approvedCerts.length > 0) {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
+        ensureSpace(18);
         doc.text("Certifications", 20, yPosition);
         yPosition += 10;
 
         approvedCerts.slice(0, 5).forEach((cert, index) => {
+          ensureSpace(22);
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
           doc.text(`${index + 1}. ${cert.certificateName}`, 20, yPosition);
@@ -318,6 +367,35 @@ const ProfessionalPortfolio = ({ studentData }) => {
       }
       yPosition += 10;
 
+      // Internships
+      const resumeInternships = academicCertificates.filter(
+        (cert) => cert.status === 'approved' && cert.domain === 'internship'
+      );
+      if (resumeInternships.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("INTERNSHIPS", 80, yPosition);
+        yPosition += 10;
+
+        resumeInternships.slice(0, 4).forEach((cert) => {
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "bold");
+          doc.text(cert.certificateName, 80, yPosition);
+          yPosition += 6;
+
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          doc.text(`${cert.issuedBy || 'N/A'}${cert.date ? ' | ' + new Date(cert.date).toLocaleDateString() : ''}`, 80, yPosition);
+          yPosition += 6;
+          if (cert.description) {
+            const desc = doc.splitTextToSize(cert.description, 120);
+            doc.text(desc, 80, yPosition);
+            yPosition += desc.length * 4;
+          }
+          yPosition += 6;
+        });
+      }
+
       // Projects
       if (projects.length > 0) {
         doc.setFontSize(14);
@@ -407,6 +485,9 @@ const ProfessionalPortfolio = ({ studentData }) => {
         .certificate p { color: #666; font-size: 0.9rem; }
         .contact-info { display: flex; justify-content: center; gap: 30px; margin-top: 20px; }
         .contact-info a { color: white; text-decoration: none; }
+        .edu-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+        .edu-item { background: #f8f9ff; border-left: 4px solid #667eea; padding: 12px 14px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
+        .edu-item strong { color: #333; }
         @media (max-width: 768px) { .header h1 { font-size: 2rem; } .contact-info { flex-direction: column; gap: 10px; } }
     </style>
 </head>
@@ -430,6 +511,33 @@ const ProfessionalPortfolio = ({ studentData }) => {
             ${profileData?.overallCGPA > 0 ? `I maintain a CGPA of ${profileData.overallCGPA}.` : ''} 
             I am passionate about technology and continuously work on projects to enhance my skills.</p>
         </div>
+
+        <div class="section">
+          <h2>Education</h2>
+          <ul class="edu-list">
+            <li class="edu-item"><strong>College:</strong> ${studentData.college || 'N/A'}</li>
+            <li class="edu-item"><strong>Program / Dept:</strong> ${studentData.department || 'N/A'}</li>
+            <li class="edu-item"><strong>Year & Semester:</strong> ${studentData.year || 'N/A'} | ${studentData.semester ? `Semester ${studentData.semester}` : 'Semester N/A'}</li>
+            ${profileData?.overallCGPA > 0 ? `<li class="edu-item"><strong>Overall CGPA:</strong> ${profileData.overallCGPA}</li>` : ''}
+            ${profileData?.currentSGPA > 0 ? `<li class="edu-item"><strong>Current SGPA:</strong> ${profileData.currentSGPA}</li>` : ''}
+          </ul>
+        </div>
+
+        ${academicCertificates.filter(cert => cert.status === 'approved' && cert.domain === 'internship').length > 0 ? `
+        <div class="section">
+          <h2>Internships</h2>
+          ${academicCertificates
+            .filter(cert => cert.status === 'approved' && cert.domain === 'internship')
+            .map(cert => `
+              <div class="certificate">
+                <h4>${cert.certificateName}</h4>
+                <p><strong>Organization:</strong> ${cert.issuedBy || 'N/A'}</p>
+                ${cert.date ? `<p><strong>Date:</strong> ${new Date(cert.date).toLocaleDateString()}</p>` : ''}
+                ${cert.description ? `<p><strong>Description:</strong> ${cert.description}</p>` : ''}
+              </div>
+            `).join('')}
+        </div>
+        ` : ''}
 
         <div class="section">
             <h2>Technical Skills</h2>

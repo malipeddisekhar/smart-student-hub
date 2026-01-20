@@ -1,0 +1,260 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../services/api";
+
+const LeetCodeCard = ({ studentData }) => {
+  const navigate = useNavigate();
+  const [leetcodeUsername, setLeetcodeUsername] = useState("");
+  const [inputValue, setInputValue] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [problemsSolved, setProblemsSolved] = useState(0);
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Fetch current LeetCode data on component mount
+  useEffect(() => {
+    const fetchLeetCodeData = async () => {
+      if (studentData?.studentId) {
+        try {
+          const response = await api.get(
+            `/api/leetcode/${studentData.studentId}`
+          );
+          if (response.data.leetcodeUsername) {
+            setLeetcodeUsername(response.data.leetcodeUsername);
+            setProblemsSolved(response.data.problemsSolved || 0);
+          }
+        } catch (err) {
+          console.error("Error fetching LeetCode data:", err);
+        }
+      }
+    };
+
+    fetchLeetCodeData();
+  }, [studentData]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    // Validate input
+    if (!inputValue.trim()) {
+      setError("Username cannot be empty");
+      return;
+    }
+
+    if (inputValue.trim().length < 2) {
+      setError("Username must be at least 2 characters");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const response = await api.post("/api/leetcode/update-username", {
+        studentId: studentData.studentId,
+        username: inputValue.trim(),
+      });
+
+      setLeetcodeUsername(response.data.leetcodeUsername);
+      setProblemsSolved(response.data.problemsSolved);
+      setSuccess("LeetCode profile saved successfully!");
+      setInputValue("");
+      setIsEditing(false);
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(""), 3000);
+    } catch (err) {
+      const errorMessage =
+        err.response?.data?.details || 
+        err.response?.data?.error || 
+        "Failed to update LeetCode profile. Please check the username and try again.";
+      setError(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-6">
+          <div className="w-16 h-16 bg-gradient-to-br from-orange-600 to-red-600 rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+            <svg
+              className="w-8 h-8 text-white"
+              fill="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" />
+            </svg>
+          </div>
+          <button
+            onClick={() => navigate("/leaderboard")}
+            className="text-orange-600 hover:text-orange-700 font-medium transition-colors"
+          >
+            View Leaderboard →
+          </button>
+        </div>
+
+        <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-orange-700 transition-colors">
+          LeetCode Credentials
+        </h3>
+        <p className="text-gray-600 mb-6">
+          Connect your LeetCode account and compete on the leaderboard
+        </p>
+
+        {/* Current Status */}
+        {leetcodeUsername && !isEditing && (
+          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-4 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-sm text-gray-600">Current LeetCode Username</p>
+                <p className="text-lg font-bold text-gray-800">
+                  {leetcodeUsername}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-gray-600">Problems Solved</p>
+                <p className="text-2xl font-bold text-orange-600">
+                  {problemsSolved}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <a
+                href={`https://leetcode.com/${leetcodeUsername}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-300 text-center"
+              >
+                View Profile
+              </a>
+              <button
+                onClick={() => {
+                  setIsEditing(true);
+                  setInputValue(leetcodeUsername);
+                }}
+                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-lg transition-all duration-300"
+              >
+                Update
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Edit/Add Form */}
+        {isEditing && (
+          <form onSubmit={handleSubmit} className="space-y-4 mb-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                LeetCode Username
+              </label>
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  setError("");
+                }}
+                placeholder="Enter your LeetCode username"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 transition-colors"
+              />
+              <p className="text-xs text-gray-500 mt-2">
+                Your LeetCode username (case-sensitive)
+              </p>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start space-x-3">
+                <svg
+                  className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            )}
+
+            {success && (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start space-x-3">
+                <svg
+                  className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <p className="text-sm text-green-700">{success}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-all duration-300 flex items-center justify-center space-x-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg
+                      className="w-5 h-5"
+                      fill="currentColor"
+                      viewBox="0 0 20 20"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span>Save</span>
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(false);
+                  setInputValue("");
+                  setError("");
+                }}
+                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-3 px-4 rounded-lg transition-all duration-300"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Initial state */}
+        {!leetcodeUsername && !isEditing && (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="w-full bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold py-4 rounded-lg transition-all duration-300 transform hover:scale-105 shadow-lg"
+          >
+            Add LeetCode Username
+          </button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default LeetCodeCard;

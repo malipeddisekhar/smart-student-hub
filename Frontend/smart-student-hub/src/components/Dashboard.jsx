@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import LeetCodeCard from "./LeetCodeCard";
+import CodeChefCard from "./CodeChefCard";
 
 const Dashboard = ({ studentData, onLogout }) => {
   const navigate = useNavigate();
@@ -556,7 +558,9 @@ const Dashboard = ({ studentData, onLogout }) => {
             </div>
           </div>
 
-          
+          <LeetCodeCard studentData={studentData} />
+          <CodeChefCard studentData={studentData} />
+
         </div>
       </div>
     </div>

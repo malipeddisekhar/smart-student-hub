@@ -44,9 +44,27 @@ const StudentRegister = ({ onRegister }) => {
       const res = await api.post("/api/register", submitData);
       setMessage(`✅ Success! ID: ${res.data.studentId}`);
 
+      // Persist the full student profile locally so resume generation has education details
+      const {
+        studentId,
+        name,
+        email,
+        college,
+        department,
+        year,
+        semester,
+        rollNumber,
+      } = res.data;
+
       onRegister({
-        name: formData.name,
-        studentId: res.data.studentId,
+        studentId,
+        name: name || formData.name,
+        email,
+        college,
+        department,
+        year,
+        semester,
+        rollNumber,
       });
 
       navigate("/dashboard");

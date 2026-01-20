@@ -81,7 +81,34 @@ const academicCertificateSchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
-  reviewedAt: Date
+  reviewedAt: Date,
+  
+  // Scan-based verification fields
+  scanStatus: { 
+    type: String, 
+    enum: ['not_scanned', 'scanning', 'scanned'], 
+    default: 'not_scanned' 
+  },
+  scanResult: { 
+    type: String, 
+    enum: ['AUTO_VERIFIED', 'AUTO_REJECTED', 'SOURCE_NOT_DIGITALLY_VERIFIABLE', null], 
+    default: null 
+  },
+  scannedAt: { type: Date },
+  scannedByTeacherId: { type: String },
+  certificateHash: { type: String },
+  
+  // Verification details
+  verificationDetails: {
+    qrCodeFound: { type: Boolean, default: false },
+    qrCodeData: { type: String },
+    verificationUrl: { type: String },
+    extractedStudentName: { type: String },
+    extractedCourseName: { type: String },
+    urlVerificationStatus: { type: String },
+    tamperingDetected: { type: Boolean, default: false },
+    verificationNotes: { type: String }
+  }
 }, {
   timestamps: true
 });
@@ -186,7 +213,31 @@ const studentSchema = new mongoose.Schema({
     }],
     default: []
   },
-  cgpa: { type: Number, default: 0 }
+  cgpa: { type: Number, default: 0 },
+  leetcodeUsername: {
+    type: String,
+    default: null
+  },
+  problemsSolved: {
+    type: Number,
+    default: 0
+  },
+  leetcodeUpdatedAt: {
+    type: Date,
+    default: null
+  },
+  codechefUsername: {
+    type: String,
+    default: null
+  },
+  codechefProblemsSolved: {
+    type: Number,
+    default: 0
+  },
+  codechefUpdatedAt: {
+    type: Date,
+    default: null
+  }
 }, {
   timestamps: true
 });

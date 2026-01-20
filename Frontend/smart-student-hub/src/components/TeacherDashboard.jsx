@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
+import CertificateScannerModal from "./CertificateScannerModal";
+
 const backendUrl = import.meta.env.VITE_API_URL;
   const backendBase = api.defaults.baseURL || import.meta.env.VITE_API_URL || '';
   const getFullUrl = (url) => {
@@ -47,6 +49,11 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [showMessageForm, setShowMessageForm] = useState(false);
   const [messageForm, setMessageForm] = useState({ subject: '', message: '' });
+  
+  // Scanner modal state
+  const [showScannerModal, setShowScannerModal] = useState(false);
+  const [scanningCert, setScanningCert] = useState(null);
+  const [scanResults, setScanResults] = useState({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1513,13 +1520,75 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                           })()}
                         </div>
                         
+                        {/* Scan Status Badge */}
+                        {cert.scanStatus && cert.scanStatus !== 'not_scanned' && (
+                          <div className="mb-3">
+                            <div className={`inline-flex items-center px-3 py-2 rounded-lg text-sm font-medium ${
+                              cert.scanResult === 'AUTO_VERIFIED' 
+                                ? 'bg-green-100 text-green-800 border border-green-300' 
+                                : cert.scanResult === 'AUTO_REJECTED'
+                                ? 'bg-red-100 text-red-800 border border-red-300'
+                                : 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                            }`}>
+                              {cert.scanResult === 'AUTO_VERIFIED' && (
+                                <>
+                                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                                  </svg>
+                                  Auto Verified - QR & URL Verified
+                                </>
+                              )}
+                              {cert.scanResult === 'AUTO_REJECTED' && (
+                                <>
+                                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd"/>
+                                  </svg>
+                                  Auto Rejected - Verification Failed
+                                </>
+                              )}
+                              {cert.scanResult === 'SOURCE_NOT_DIGITALLY_VERIFIABLE' && (
+                                <>
+                                  <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                                  </svg>
+                                  Not Digitally Verifiable - No QR Found
+                                </>
+                              )}
+                            </div>
+                            {cert.verificationDetails?.verificationNotes && (
+                              <p className="text-xs text-gray-600 mt-2">
+                                {cert.verificationDetails.verificationNotes}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Scan Button */}
+                        <div className="mb-3">
+                          <button
+                            onClick={() => {
+                              setScanningCert(cert);
+                              setShowScannerModal(true);
+                            }}
+                            className="w-full flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all duration-200 bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 shadow-lg transform hover:scale-105"
+                          >
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm2 2V5h1v1H5zM3 13a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm2 2v-1h1v1H5zM13 3a1 1 0 00-1 1v3a1 1 0 001 1h3a1 1 0 001-1V4a1 1 0 00-1-1h-3zm1 2v1h1V5h-1z" clipRule="evenodd"/>
+                              <path d="M11 4a1 1 0 10-2 0v1a1 1 0 002 0V4zM10 7a1 1 0 011 1v1h2a1 1 0 110 2h-3a1 1 0 01-1-1V8a1 1 0 011-1zM16 9a1 1 0 100 2 1 1 0 000-2zM9 13a1 1 0 011-1h1a1 1 0 110 2v2a1 1 0 11-2 0v-3zM7 11a1 1 0 100-2H4a1 1 0 100 2h3zM17 13a1 1 0 01-1 1h-2a1 1 0 110-2h2a1 1 0 011 1zM16 17a1 1 0 100-2h-3a1 1 0 100 2h3z"/>
+                            </svg>
+                            <span>
+                              {cert.scanStatus === 'scanned' ? 'Re-scan Certificate' : 'Scan Certificate'}
+                            </span>
+                          </button>
+                        </div>
+                        
                         <div className="flex gap-2">
                           <button
                             onClick={() => {
                               setReviewingCert(cert);
                               setReviewForm({ status: 'approved', feedback: '' });
                             }}
-                            className="flex-1 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
+                            className="flex-1 px-3 py-2 rounded text-sm font-medium transition-colors bg-green-500 hover:bg-green-600 text-white"
                           >
                             ✓ Approve
                           </button>
@@ -1528,7 +1597,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                               setReviewingCert(cert);
                               setReviewForm({ status: 'rejected', feedback: '' });
                             }}
-                            className="flex-1 bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm font-medium transition-colors"
+                            className="flex-1 px-3 py-2 rounded text-sm font-medium transition-colors bg-red-500 hover:bg-red-600 text-white"
                           >
                             ✗ Reject
                           </button>
@@ -1922,10 +1991,12 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                         return;
                       }
                       
+                      // Use new scan-aware endpoints
                       const path = reviewForm.status === 'approved'
-                        ? `/api/review/academic-certificates/${reviewingCert.studentId}/${reviewingCert.certificateId}/approve`
-                        : `/api/review/academic-certificates/${reviewingCert.studentId}/${reviewingCert.certificateId}/reject`;
-                      await api.post(path, { feedback: reviewForm.feedback });
+                        ? `/api/review/academic-certificates/${reviewingCert.studentId}/${reviewingCert.certificateId}/approve-with-scan`
+                        : `/api/review/academic-certificates/${reviewingCert.studentId}/${reviewingCert.certificateId}/reject-with-scan`;
+                      
+                      const response = await api.post(path, { feedback: reviewForm.feedback });
                       
                       alert(`Certificate ${reviewForm.status} successfully!`);
                       setReviewingCert(null);
@@ -1934,7 +2005,15 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                       const certsRes = await api.get('/api/review/academic-certificates');
                       setPendingCertificates(certsRes.data);
                     } catch (error) {
-                      alert('Error reviewing certificate: ' + (error.response?.data?.error || error.message));
+                      const errorMsg = error.response?.data?.error || error.message;
+                      if (error.response?.data?.requiresScan) {
+                        alert('⚠️ Scan Required\n\n' + errorMsg);
+                      } else if (error.response?.data?.scanResult) {
+                        alert('⚠️ Cannot Approve\n\n' + errorMsg);
+                      } else {
+                        alert('Error reviewing certificate: ' + errorMsg);
+                      }
+                      setReviewingCert(null);
                     }
                   }}
                   className={`flex-1 font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 ${
@@ -2055,6 +2134,45 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
             </div>
           </div>
         </div>
+      )}
+      
+      {/* Certificate Scanner Modal */}
+      {showScannerModal && scanningCert && (
+        <CertificateScannerModal
+          isOpen={showScannerModal}
+          onClose={() => {
+            setShowScannerModal(false);
+            setScanningCert(null);
+          }}
+          certificateImageUrl={scanningCert.image}
+          studentId={scanningCert.studentId}
+          certificateId={scanningCert.certificateId}
+          onScanComplete={async (scanData) => {
+            console.log('Scan complete:', scanData);
+            
+            // Close scanner modal
+            setShowScannerModal(false);
+            
+            // Show scan result
+            const resultMessage = scanData.scanResult === 'AUTO_VERIFIED'
+              ? '✅ Certificate verified successfully!\n\nQR code found and verified. You can now approve this certificate.'
+              : scanData.scanResult === 'AUTO_REJECTED'
+              ? '❌ Certificate verification failed!\n\n' + (scanData.verificationDetails?.verificationNotes || 'Verification failed. Please review and reject.')
+              : '⚠️ Cannot verify digitally\n\nNo QR code found. Manual review required before approval/rejection.';
+            
+            alert(resultMessage);
+            
+            // Refresh certificates to show updated scan status
+            try {
+              const certsRes = await api.get('/api/review/academic-certificates');
+              setPendingCertificates(certsRes.data);
+            } catch (error) {
+              console.error('Error refreshing certificates:', error);
+            }
+            
+            setScanningCert(null);
+          }}
+        />
       )}
     </div>
   );

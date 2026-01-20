@@ -13,6 +13,8 @@ const College = require("./models/College");
 const Group = require("./models/Group");
 const Message = require("./models/Message");
 const { OAuth2Client } = require('google-auth-library');
+const { fetchLeetCodeStats } = require("./utils/leetcodeService");
+const { fetchCodeChefStats } = require("./utils/codechefService");
 
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -239,6 +241,13 @@ app.post("/api/register", async (req, res) => {
     res.status(201).json({
       message: "Student registered successfully",
       studentId: student.studentId,
+      name: student.name,
+      email: student.email,
+      college: student.college,
+      department: student.department,
+      year: student.year,
+      semester: student.semester,
+      rollNumber: student.rollNumber,
     });
   } catch (error) {
     console.error("❌ Registration Error:", error.message);
@@ -256,7 +265,17 @@ app.post("/api/login", async (req, res) => {
     const valid = await bcrypt.compare(password, student.password);
     if (!valid) return res.status(400).json({ error: "Invalid email or password" });
 
-    res.json({ message: "Login successful", studentId: student.studentId, name: student.name });
+    res.json({
+      message: "Login successful",
+      studentId: student.studentId,
+      name: student.name,
+      email: student.email,
+      college: student.college,
+      department: student.department,
+      year: student.year,
+      semester: student.semester,
+      rollNumber: student.rollNumber,
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -466,6 +485,11 @@ app.get('/api/review/academic-certificates', async (req, res) => {
             location: c.location,
             organizationType: c.organizationType,
             submittedAt: c.submittedAt,
+            // Scan information
+            scanStatus: c.scanStatus || 'not_scanned',
+            scanResult: c.scanResult || null,
+            scannedAt: c.scannedAt || null,
+            verificationDetails: c.verificationDetails || {}
           });
         }
       }
@@ -508,6 +532,213 @@ app.post('/api/review/academic-certificates/:studentId/:certificateId/reject', a
 
     const cert = (student.academicCertificates || []).find(c => String(c._id) === String(certificateId));
     if (!cert) return res.status(404).json({ error: 'Certificate not found' });
+
+    cert.status = 'rejected';
+    cert.feedback = feedback || '';
+    cert.reviewedAt = new Date();
+    await student.save();
+
+    res.json({ message: 'Certificate rejected' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ---------------------
+// Certificate Scanning & Verification
+// ---------------------
+const { scanAndVerifyCertificate } = require('./utils/certificateScanService');
+
+// Rate limiting map to prevent abuse
+const scanRateLimits = new Map();
+const SCAN_RATE_LIMIT_MS = 5000; // 5 seconds between scans
+
+app.post('/api/scan-certificate/:studentId/:certificateId', async (req, res) => {
+  try {
+    const { studentId, certificateId } = req.params;
+    const { teacherId } = req.body;
+    
+    if (!teacherId) {
+      return res.status(400).json({ error: 'Teacher ID is required' });
+    }
+    
+    // Rate limiting check
+    const rateLimitKey = `${teacherId}_${certificateId}`;
+    const lastScanTime = scanRateLimits.get(rateLimitKey);
+    const now = Date.now();
+    
+    if (lastScanTime && (now - lastScanTime) < SCAN_RATE_LIMIT_MS) {
+      const waitTime = Math.ceil((SCAN_RATE_LIMIT_MS - (now - lastScanTime)) / 1000);
+      return res.status(429).json({ 
+        error: `Please wait ${waitTime} seconds before scanning again` 
+      });
+    }
+    
+    // Find student and certificate
+    const student = await Student.findOne({ studentId });
+    if (!student) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+    
+    const cert = (student.academicCertificates || []).find(
+      c => String(c._id) === String(certificateId)
+    );
+    
+    if (!cert) {
+      return res.status(404).json({ error: 'Certificate not found' });
+    }
+    
+    // Update scan status to 'scanning'
+    cert.scanStatus = 'scanning';
+    await student.save();
+    
+    // Update rate limit
+    scanRateLimits.set(rateLimitKey, now);
+    
+    try {
+      // Get certificate image URL
+      const certificateImageUrl = resolveCloudinaryUrl(cert.image);
+      
+      if (!certificateImageUrl) {
+        throw new Error('Certificate image URL is invalid or missing');
+      }
+      
+      console.log('Scanning certificate:', certificateImageUrl);
+      
+      // Perform scan and verification
+      const scanResult = await scanAndVerifyCertificate(
+        certificateImageUrl,
+        { name: student.name, courseName: cert.certificateName },
+        cert.certificateHash // Previous hash if exists
+      );
+      
+      console.log('Scan completed:', scanResult.scanResult);
+      
+      // Update certificate with scan results
+      cert.scanStatus = 'scanned';
+      cert.scanResult = scanResult.scanResult;
+      cert.scannedAt = new Date();
+      cert.scannedByTeacherId = teacherId;
+      cert.certificateHash = scanResult.certificateHash;
+      cert.verificationDetails = scanResult.verificationDetails;
+      
+      await student.save();
+      
+      return res.json({
+        message: 'Certificate scanned successfully',
+        scanResult: scanResult.scanResult,
+        verificationDetails: scanResult.verificationDetails
+      });
+    } catch (scanError) {
+      // Update scan status to error
+      cert.scanStatus = 'not_scanned';
+      await student.save();
+      
+      console.error('Scan error:', scanError);
+      return res.status(500).json({ 
+        error: 'Failed to scan certificate',
+        details: scanError.message 
+      });
+    }
+  } catch (error) {
+    console.error('Error in scan-certificate endpoint:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get scan status for a certificate
+app.get('/api/scan-status/:studentId/:certificateId', async (req, res) => {
+  try {
+    const { studentId, certificateId } = req.params;
+    
+    const student = await Student.findOne({ studentId });
+    if (!student) {
+      return res.status(404).json({ error: 'Student not found' });
+    }
+    
+    const cert = (student.academicCertificates || []).find(
+      c => String(c._id) === String(certificateId)
+    );
+    
+    if (!cert) {
+      return res.status(404).json({ error: 'Certificate not found' });
+    }
+    
+    res.json({
+      scanStatus: cert.scanStatus || 'not_scanned',
+      scanResult: cert.scanResult || null,
+      scannedAt: cert.scannedAt || null,
+      verificationDetails: cert.verificationDetails || {}
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Updated approve endpoint to check scan status
+app.post('/api/review/academic-certificates/:studentId/:certificateId/approve-with-scan', async (req, res) => {
+  try {
+    const { studentId, certificateId } = req.params;
+    const { feedback } = req.body;
+    
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    const cert = (student.academicCertificates || []).find(
+      c => String(c._id) === String(certificateId)
+    );
+    
+    if (!cert) return res.status(404).json({ error: 'Certificate not found' });
+    
+    // Check if certificate has been scanned
+    if (!cert.scanStatus || cert.scanStatus === 'not_scanned') {
+      return res.status(400).json({ 
+        error: 'Certificate must be scanned before approval',
+        requiresScan: true
+      });
+    }
+    
+    // Check if scan result is AUTO_VERIFIED
+    if (cert.scanResult !== 'AUTO_VERIFIED') {
+      return res.status(400).json({ 
+        error: `Cannot approve certificate with scan result: ${cert.scanResult}. Only AUTO_VERIFIED certificates can be approved.`,
+        scanResult: cert.scanResult
+      });
+    }
+
+    cert.status = 'approved';
+    cert.feedback = feedback || '';
+    cert.reviewedAt = new Date();
+    await student.save();
+
+    res.json({ message: 'Certificate approved' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Updated reject endpoint to check scan status
+app.post('/api/review/academic-certificates/:studentId/:certificateId/reject-with-scan', async (req, res) => {
+  try {
+    const { studentId, certificateId } = req.params;
+    const { feedback } = req.body;
+    
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    const cert = (student.academicCertificates || []).find(
+      c => String(c._id) === String(certificateId)
+    );
+    
+    if (!cert) return res.status(404).json({ error: 'Certificate not found' });
+    
+    // Check if certificate has been scanned
+    if (!cert.scanStatus || cert.scanStatus === 'not_scanned') {
+      return res.status(400).json({ 
+        error: 'Certificate must be scanned before rejection',
+        requiresScan: true
+      });
+    }
 
     cert.status = 'rejected';
     cert.feedback = feedback || '';
@@ -747,5 +978,302 @@ app.get('/api/students/:studentId', async (req, res) => {
   }
 });
 
+// ---------------------
+// Search routes
+// ---------------------
+app.get('/api/search/students', async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query || query.trim().length < 2) {
+      return res.json([]);
+    }
+
+    const searchQuery = query.trim();
+    const students = await Student.find(
+      {
+        $or: [
+          { name: { $regex: searchQuery, $options: 'i' } },
+          { studentId: { $regex: searchQuery, $options: 'i' } },
+          { rollNumber: { $regex: searchQuery, $options: 'i' } },
+          { college: { $regex: searchQuery, $options: 'i' } },
+          { email: { $regex: searchQuery, $options: 'i' } }
+        ]
+      },
+      {
+        studentId: 1,
+        name: 1,
+        email: 1,
+        college: 1,
+        department: 1,
+        year: 1,
+        rollNumber: 1,
+        'profile.profileImage': 1
+      }
+    ).limit(10).lean();
+
+    res.json(students);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ---------------------
+// LeetCode routes
+// ---------------------
+app.post('/api/leetcode/update-username', async (req, res) => {
+  try {
+    const { studentId, username } = req.body;
+
+    if (!studentId || !username) {
+      return res.status(400).json({ error: 'StudentId and username are required' });
+    }
+
+    if (typeof username !== 'string' || username.trim().length === 0) {
+      return res.status(400).json({ error: 'Username cannot be empty' });
+    }
+
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    // Fetch LeetCode stats
+    try {
+      const leetcodeData = await fetchLeetCodeStats(username.trim());
+      student.leetcodeUsername = leetcodeData.username;
+      student.problemsSolved = leetcodeData.totalSolved;
+      student.leetcodeUpdatedAt = new Date();
+      await student.save();
+
+      res.json({
+        message: 'LeetCode username saved successfully',
+        leetcodeUsername: student.leetcodeUsername,
+        problemsSolved: student.problemsSolved
+      });
+    } catch (error) {
+      return res.status(400).json({ 
+        error: 'Failed to fetch LeetCode stats',
+        details: error.message 
+      });
+    }
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/leetcode/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    res.json({
+      leetcodeUsername: student.leetcodeUsername || null,
+      problemsSolved: student.problemsSolved || 0,
+      leetcodeUpdatedAt: student.leetcodeUpdatedAt || null
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/leaderboard', async (req, res) => {
+  try {
+    const students = await Student.find(
+      {
+        $or: [
+          { leetcodeUsername: { $exists: true, $ne: null } },
+          { codechefUsername: { $exists: true, $ne: null } }
+        ]
+      },
+      { 
+        studentId: 1, 
+        name: 1, 
+        college: 1, 
+        department: 1, 
+        leetcodeUsername: 1, 
+        problemsSolved: 1, 
+        leetcodeUpdatedAt: 1,
+        codechefUsername: 1,
+        codechefProblemsSolved: 1,
+        codechefUpdatedAt: 1
+      }
+    )
+      .lean();
+
+    // Calculate total and sort by total problems solved
+    const leaderboard = students.map((student) => ({
+      ...student,
+      leetcodeSolved: student.problemsSolved || 0,
+      codechefSolved: student.codechefProblemsSolved || 0,
+      totalSolved: (student.problemsSolved || 0) + (student.codechefProblemsSolved || 0)
+    }))
+    .sort((a, b) => b.totalSolved - a.totalSolved)
+    .map((student, index) => ({
+      ...student,
+      rank: index + 1
+    }));
+
+    res.json(leaderboard);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// LeetCode-only leaderboard
+app.get('/api/leaderboard/leetcode', async (req, res) => {
+  try {
+    const students = await Student.find(
+      { leetcodeUsername: { $exists: true, $ne: null } },
+      { 
+        studentId: 1, 
+        name: 1, 
+        college: 1, 
+        department: 1, 
+        leetcodeUsername: 1, 
+        problemsSolved: 1, 
+        leetcodeUpdatedAt: 1
+      }
+    ).lean();
+
+    const leaderboard = students
+      .map((student) => ({
+        ...student,
+        problemsSolvedCount: student.problemsSolved || 0
+      }))
+      .sort((a, b) => b.problemsSolvedCount - a.problemsSolvedCount)
+      .map((student, index) => ({
+        ...student,
+        rank: index + 1
+      }));
+
+    res.json(leaderboard);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// CodeChef-only leaderboard
+app.get('/api/leaderboard/codechef', async (req, res) => {
+  try {
+    const students = await Student.find(
+      { codechefUsername: { $exists: true, $ne: null } },
+      { 
+        studentId: 1, 
+        name: 1, 
+        college: 1, 
+        department: 1, 
+        codechefUsername: 1,
+        codechefProblemsSolved: 1,
+        codechefUpdatedAt: 1
+      }
+    ).lean();
+
+    const leaderboard = students
+      .map((student) => ({
+        ...student,
+        problemsSolvedCount: student.codechefProblemsSolved || 0
+      }))
+      .sort((a, b) => b.problemsSolvedCount - a.problemsSolvedCount)
+      .map((student, index) => ({
+        ...student,
+        rank: index + 1
+      }));
+
+    res.json(leaderboard);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ---------------------
+// CodeChef routes
+// ---------------------
+app.post('/api/codechef/update-username', async (req, res) => {
+  try {
+    const { studentId, username } = req.body;
+
+    if (!studentId || !username) {
+      return res.status(400).json({ error: 'StudentId and username are required' });
+    }
+
+    if (typeof username !== 'string' || username.trim().length === 0) {
+      return res.status(400).json({ error: 'Username cannot be empty' });
+    }
+
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    // Fetch CodeChef stats with caching support
+    // Pass existing student data for cache validation
+    try {
+      const cachedData = {
+        codechefUsername: student.codechefUsername,
+        codechefProblemsSolved: student.codechefProblemsSolved,
+        codechefUpdatedAt: student.codechefUpdatedAt
+      };
+
+      const codechefData = await fetchCodeChefStats(username.trim(), cachedData);
+      
+      // Update student record with all fetched stats
+      student.codechefUsername = codechefData.username;
+      student.codechefProblemsSolved = codechefData.totalSolved || 0;
+      student.codechefUpdatedAt = new Date();
+      
+      console.log('Saving student with CodeChef data:', {
+        studentId: student.studentId,
+        codechefUsername: student.codechefUsername,
+        codechefProblemsSolved: student.codechefProblemsSolved
+      });
+      
+      await student.save();
+      
+      console.log('Student saved successfully');
+
+      const response = {
+        message: codechefData.fromCache 
+          ? 'CodeChef username loaded from cache' 
+          : 'CodeChef username saved successfully',
+        codechefUsername: student.codechefUsername,
+        codechefProblemsSolved: student.codechefProblemsSolved,
+        fromCache: codechefData.fromCache || false
+      };
+
+      // Add warning if profile is private
+      if (codechefData.isPrivate) {
+        response.warning = codechefData.warning;
+      }
+
+      res.json(response);
+    } catch (error) {
+      // Only return error for invalid username or not found
+      if (error.type === 'NOT_FOUND' || error.type === 'INVALID_INPUT') {
+        return res.status(400).json({ 
+          error: error.message
+        });
+      }
+      // For network errors, return error but don't fail completely
+      return res.status(503).json({ 
+        error: error.message
+      });
+    }
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/codechef/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    res.json({
+      codechefUsername: student.codechefUsername || null,
+      codechefProblemsSolved: student.codechefProblemsSolved || 0,
+      codechefUpdatedAt: student.codechefUpdatedAt || null
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 app.listen(port, () => console.log(`Server running at http://localhost:${port}`));

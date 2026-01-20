@@ -23,6 +23,7 @@ import AdminLogin from "./components/AdminLogin";
 import AdminRegister from "./components/AdminRegister";
 import AdminDashboard from "./components/AdminDashboard";
 import StudentDetails from "./components/StudentDetails";
+import Leaderboard from "./components/Leaderboard";
 import api from "./services/api";
 
 function App() {
@@ -91,6 +92,10 @@ function App() {
         <Route
           path="/student/:studentId"
           element={<StudentDetails />}
+        />
+        <Route
+          path="/leaderboard"
+          element={<Leaderboard studentData={studentData} />}
         />
         <Route
           path="/login"

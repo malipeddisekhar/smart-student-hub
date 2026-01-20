@@ -190,16 +190,10 @@ const LandingPage = () => {
                 Student
               </button>
               <button
-                onClick={() => navigate("/teacher/login")}
-                className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-md text-sm font-medium transition duration-300"
+                onClick={() => navigate("/leaderboard")}
+                className="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-md text-sm font-medium transition duration-300"
               >
-                Teacher
-              </button>
-              <button
-                onClick={() => navigate("/admin/login")}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md text-sm font-medium transition duration-300"
-              >
-                Admin
+                Leaderboard
               </button>
             </div>
           </div>
