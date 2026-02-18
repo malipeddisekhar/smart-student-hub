@@ -5,6 +5,8 @@ const bcrypt = require("bcrypt");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const session = require("express-session");
+const passport = require("passport");
 const connectDB = require("./config/database");
 const Student = require("./models/Student");
 const Teacher = require("./models/Teacher");
@@ -15,6 +17,7 @@ const Message = require("./models/Message");
 const { OAuth2Client } = require('google-auth-library');
 const { fetchLeetCodeStats } = require("./utils/leetcodeService");
 const { fetchCodeChefStats } = require("./utils/codechefService");
+const { buildStudentProfile, analyzeResumeWithAI } = require("./utils/resumeAnalyzerAI");
 
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -40,6 +43,11 @@ const resolveCloudinaryUrl = (val) => {
     return s;
   }
 };
+
+// Helper to escape user input for use in RegExp
+function escapeRegExp(string) {
+  return String(string).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -70,8 +78,6 @@ const personalUpload = multer({ storage: personalStorage });
 connectDB();
 
 // Middleware
-
-
 app.use(cors({
   origin: [
     'http://localhost:5173',                     // local dev
@@ -83,6 +89,24 @@ app.use(cors({
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Session configuration for Passport
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'your-session-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
+}));
+
+// Initialize Passport and configure Microsoft OAuth strategy
+require('./config/passport')(app);
+
+// Mount authentication routes
+const authRoutes = require('./routes/auth');
+app.use('/auth', authRoutes);
 
 // Google OAuth2 client for ID token verification
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -210,7 +234,7 @@ app.post("/api/admin/register", async (req, res) => {
 app.post("/api/admin/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const admin = await Admin.findOne({ email });
+    const admin = await Admin.findOne({ email: new RegExp('^' + escapeRegExp(email) + '$', 'i') });
     if (!admin) return res.status(400).json({ error: "Invalid email or password" });
 
     const valid = await bcrypt.compare(password, admin.password);
@@ -259,7 +283,7 @@ app.post("/api/register", async (req, res) => {
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const student = await Student.findOne({ email });
+    const student = await Student.findOne({ email: new RegExp('^' + escapeRegExp(email) + '$', 'i') });
     if (!student) return res.status(400).json({ error: "Invalid email or password" });
 
     const valid = await bcrypt.compare(password, student.password);
@@ -302,7 +326,7 @@ app.post("/api/teacher/register", async (req, res) => {
 app.post("/api/teacher/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const teacher = await Teacher.findOne({ email });
+    const teacher = await Teacher.findOne({ email: new RegExp('^' + escapeRegExp(email) + '$', 'i') });
     if (!teacher) return res.status(400).json({ error: "Invalid email or password" });
 
     const valid = await bcrypt.compare(password, teacher.password);
@@ -981,6 +1005,66 @@ app.get('/api/students/:studentId', async (req, res) => {
 // ---------------------
 // Search routes
 // ---------------------
+
+// ---------------------
+// Portfolio Data (Resume/Portfolio Editor)
+// ---------------------
+app.get('/api/portfolio-data/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+    res.json(student.portfolioData || {});
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/portfolio-data/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    student.portfolioData = {
+      ...student.portfolioData,
+      ...req.body,
+      updatedAt: new Date()
+    };
+
+    await student.save();
+    res.json({ message: 'Portfolio data updated', portfolioData: student.portfolioData });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ============================================
+// AI Resume Analysis & Internship Recommendations
+// ============================================
+app.get('/api/resume-analysis/:studentId', async (req, res) => {
+  try {
+    const student = await Student.findOne({ studentId: req.params.studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    // Gather all data
+    const AcademicCertificate = require('./models/AcademicCertificate');
+    const certs = await AcademicCertificate.find({ studentId: student._id });
+
+    const profileData = student.profile || {};
+    const portfolioData = student.portfolioData || {};
+    const projects = student.projects || [];
+
+    const studentProfile = buildStudentProfile(student, profileData, portfolioData, certs, projects);
+    const analysis = await analyzeResumeWithAI(studentProfile);
+
+    res.json({ success: true, analysis, profile: studentProfile });
+  } catch (error) {
+    console.error('Resume analysis error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to analyze resume' });
+  }
+});
+
 app.get('/api/search/students', async (req, res) => {
   try {
     const { query } = req.query;
@@ -1064,6 +1148,22 @@ app.get('/api/leetcode/:studentId', async (req, res) => {
     const { studentId } = req.params;
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    // Auto-refresh if data is stale (older than 30 minutes) and username exists
+    const THIRTY_MIN = 30 * 60 * 1000;
+    const isStale = !student.leetcodeUpdatedAt || (Date.now() - new Date(student.leetcodeUpdatedAt).getTime() > THIRTY_MIN);
+
+    if (student.leetcodeUsername && isStale) {
+      try {
+        console.log(`🔄 Auto-refreshing LeetCode stats for ${student.leetcodeUsername}`);
+        const fresh = await fetchLeetCodeStats(student.leetcodeUsername);
+        student.problemsSolved = fresh.totalSolved;
+        student.leetcodeUpdatedAt = new Date();
+        await student.save();
+      } catch (err) {
+        console.error('Auto-refresh LeetCode failed:', err.message);
+      }
+    }
 
     res.json({
       leetcodeUsername: student.leetcodeUsername || null,
@@ -1266,6 +1366,24 @@ app.get('/api/codechef/:studentId', async (req, res) => {
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
+    // Auto-refresh if data is stale (older than 30 minutes) and username exists
+    const THIRTY_MIN = 30 * 60 * 1000;
+    const isStale = !student.codechefUpdatedAt || (Date.now() - new Date(student.codechefUpdatedAt).getTime() > THIRTY_MIN);
+
+    if (student.codechefUsername && isStale) {
+      try {
+        console.log(`🔄 Auto-refreshing CodeChef stats for ${student.codechefUsername}`);
+        const fresh = await fetchCodeChefStats(student.codechefUsername);
+        if (!fresh.error) {
+          student.codechefProblemsSolved = fresh.totalSolved || 0;
+          student.codechefUpdatedAt = new Date();
+          await student.save();
+        }
+      } catch (err) {
+        console.error('Auto-refresh CodeChef failed:', err.message);
+      }
+    }
+
     res.json({
       codechefUsername: student.codechefUsername || null,
       codechefProblemsSolved: student.codechefProblemsSolved || 0,
@@ -1276,4 +1394,111 @@ app.get('/api/codechef/:studentId', async (req, res) => {
   }
 });
 
-app.listen(port, () => console.log(`Server running at http://localhost:${port}`));
+// Manual refresh endpoint — force-fetch latest stats
+app.post('/api/codechef/refresh/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+    if (!student.codechefUsername) return res.status(400).json({ error: 'No CodeChef username set' });
+
+    const { getCodeChefStats } = require('./utils/codechefService');
+    const fresh = await getCodeChefStats(student.codechefUsername);
+    if (fresh.error) return res.status(400).json({ error: fresh.error });
+
+    student.codechefProblemsSolved = fresh.totalSolved || 0;
+    student.codechefUpdatedAt = new Date();
+    await student.save();
+
+    res.json({
+      codechefUsername: student.codechefUsername,
+      codechefProblemsSolved: student.codechefProblemsSolved,
+      codechefUpdatedAt: student.codechefUpdatedAt,
+      message: 'Stats refreshed successfully'
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Manual refresh endpoint for LeetCode
+app.post('/api/leetcode/refresh/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+    if (!student.leetcodeUsername) return res.status(400).json({ error: 'No LeetCode username set' });
+
+    const leetcodeData = await fetchLeetCodeStats(student.leetcodeUsername);
+    student.problemsSolved = leetcodeData.totalSolved;
+    student.leetcodeUpdatedAt = new Date();
+    await student.save();
+
+    res.json({
+      leetcodeUsername: student.leetcodeUsername,
+      problemsSolved: student.problemsSolved,
+      leetcodeUpdatedAt: student.leetcodeUpdatedAt,
+      message: 'Stats refreshed successfully'
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ---------------------
+// Background auto-refresh: Update all students' coding stats every 30 minutes
+// ---------------------
+const autoRefreshAllStats = async () => {
+  console.log('🔄 [Auto-Refresh] Starting background stats update...');
+  try {
+    const students = await Student.find({
+      $or: [
+        { codechefUsername: { $exists: true, $ne: null, $ne: '' } },
+        { leetcodeUsername: { $exists: true, $ne: null, $ne: '' } }
+      ]
+    });
+
+    let updated = 0;
+    for (const student of students) {
+      // Refresh CodeChef
+      if (student.codechefUsername) {
+        try {
+          const cc = await fetchCodeChefStats(student.codechefUsername, null);
+          if (!cc.error) {
+            student.codechefProblemsSolved = cc.totalSolved || 0;
+            student.codechefUpdatedAt = new Date();
+            updated++;
+          }
+        } catch (e) {
+          console.error(`  CodeChef refresh failed for ${student.codechefUsername}:`, e.message);
+        }
+      }
+      // Refresh LeetCode
+      if (student.leetcodeUsername) {
+        try {
+          const lc = await fetchLeetCodeStats(student.leetcodeUsername);
+          student.problemsSolved = lc.totalSolved;
+          student.leetcodeUpdatedAt = new Date();
+          updated++;
+        } catch (e) {
+          console.error(`  LeetCode refresh failed for ${student.leetcodeUsername}:`, e.message);
+        }
+      }
+      await student.save();
+      // Small delay to avoid rate limiting
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    console.log(`✅ [Auto-Refresh] Updated ${updated} stats for ${students.length} students`);
+  } catch (err) {
+    console.error('❌ [Auto-Refresh] Error:', err.message);
+  }
+};
+
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+  // Run first auto-refresh 1 minute after server starts
+  setTimeout(autoRefreshAllStats, 60 * 1000);
+  // Then every 30 minutes
+  setInterval(autoRefreshAllStats, 30 * 60 * 1000);
+  console.log('🔄 Auto-refresh scheduled: every 30 minutes');
+});

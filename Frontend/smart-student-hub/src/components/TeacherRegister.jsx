@@ -192,7 +192,7 @@ const TeacherRegister = ({ onRegister }) => {
           <p className="text-gray-600">
             Already have an account?{' '}
             <button
-              onClick={() => navigate('/teacher/login')}
+              onClick={() => navigate('/login')}
               className="text-green-600 hover:text-green-700 font-medium"
             >
               Login here

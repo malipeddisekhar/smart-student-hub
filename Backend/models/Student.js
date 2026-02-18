@@ -147,11 +147,25 @@ const studentSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
-    unique: true
+    unique: true // Ensures no duplicate emails - single source of truth
   },
   password: {
     type: String,
-    required: true
+    required: false // Allow OAuth users to not have password
+  },
+  microsoftId: {
+    type: String,
+    sparse: true, // Allows null values while maintaining uniqueness for non-null values
+    unique: true
+  },
+  isVerified: {
+    type: Boolean,
+    default: false // Set to true for OAuth users
+  },
+  authProvider: {
+    type: String,
+    enum: ['local', 'microsoft', 'google'],
+    default: 'local'
   },
   college: {
     type: String,
@@ -160,6 +174,10 @@ const studentSchema = new mongoose.Schema({
   department: {
     type: String,
     required: true
+  },
+  section: {
+    type: String,
+    default: null
   },
   year: {
     type: Number,
@@ -237,6 +255,46 @@ const studentSchema = new mongoose.Schema({
   codechefUpdatedAt: {
     type: Date,
     default: null
+  },
+  portfolioData: {
+    aboutMe: { type: String, default: '' },
+    headline: { type: String, default: '' },
+    objectiveSummary: { type: String, default: '' },
+    customSkills: [String],
+    education: [{
+      institution: String,
+      degree: String,
+      field: String,
+      startYear: String,
+      endYear: String,
+      gpa: String,
+      description: String
+    }],
+    experience: [{
+      title: String,
+      company: String,
+      location: String,
+      startDate: String,
+      endDate: String,
+      current: { type: Boolean, default: false },
+      description: String
+    }],
+    customProjects: [{
+      title: String,
+      description: String,
+      technologies: String,
+      githubLink: String,
+      deployLink: String
+    }],
+    awards: [{
+      title: String,
+      issuer: String,
+      date: String,
+      description: String
+    }],
+    languages: [String],
+    hobbies: [String],
+    updatedAt: { type: Date, default: Date.now }
   }
 }, {
   timestamps: true

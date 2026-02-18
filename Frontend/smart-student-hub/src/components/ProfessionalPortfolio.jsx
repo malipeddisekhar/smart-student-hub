@@ -6,10 +6,12 @@ const ProfessionalPortfolio = ({ studentData }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('portfolio');
   const [profileData, setProfileData] = useState(null);
+  const [fullStudentData, setFullStudentData] = useState(studentData);
   const [projects, setProjects] = useState([]);
   const [academicCertificates, setAcademicCertificates] = useState([]);
   const [personalCertificates, setPersonalCertificates] = useState([]);
   const [skills, setSkills] = useState({});
+  const [portfolioEditorData, setPortfolioEditorData] = useState(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -19,17 +21,21 @@ const ProfessionalPortfolio = ({ studentData }) => {
   const fetchAllData = async () => {
     try {
       setLoading(true);
-      const [profileRes, projectsRes, academicRes, personalRes] = await Promise.all([
+      const [profileRes, projectsRes, academicRes, personalRes, studentRes, portfolioRes] = await Promise.all([
         api.get(`/api/profile/${studentData.studentId}`),
         api.get(`/api/projects/${studentData.studentId}`),
         api.get(`/api/academic-certificates/${studentData.studentId}`),
-        api.get(`/api/certificates/${studentData.studentId}`)
+        api.get(`/api/certificates/${studentData.studentId}`),
+        api.get(`/api/students/${studentData.studentId}`).catch(() => ({ data: studentData })),
+        api.get(`/api/portfolio-data/${studentData.studentId}`).catch(() => ({ data: null }))
       ]);
 
       setProfileData(profileRes.data);
+      setFullStudentData(studentRes.data || studentData);
       setProjects(projectsRes.data);
       setAcademicCertificates(academicRes.data);
       setPersonalCertificates(personalRes.data);
+      setPortfolioEditorData(portfolioRes.data || null);
       
       // Extract skills from academic certificates
       const allSkills = {};
@@ -52,32 +58,49 @@ const ProfessionalPortfolio = ({ studentData }) => {
     try {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF();
+      const ed = portfolioEditorData; // shorthand for editor data
+      
+      // Safe access helpers - use fullStudentData which has complete info from DB
+      const name = fullStudentData?.name || studentData?.name || 'Student';
+      const department = fullStudentData?.department || studentData?.department || 'Department';
+      const college = fullStudentData?.college || studentData?.college || 'College';
+      const year = fullStudentData?.year || studentData?.year || 'N/A';
+      const semester = fullStudentData?.semester || studentData?.semester || 'N/A';
+      const headline = ed?.headline || `${department} Student | ${college}`;
+      
+      // Merge skills: editor custom skills + cert-extracted skills
+      const mergedSkills = ed?.customSkills?.length > 0 ? ed.customSkills : Object.keys(skills || {});
+      // Use editor projects if available, else original
+      const mergedProjects = ed?.customProjects?.length > 0 ? ed.customProjects : (projects || []);
+      // Education from editor
+      const editorEducation = ed?.education?.length > 0 ? ed.education : null;
+      // Experience from editor
+      const editorExperience = ed?.experience || [];
+      // Awards from editor
+      const editorAwards = ed?.awards || [];
       
       // Colors
-      const primaryColor = [59, 130, 246]; // Blue-500
-      const secondaryColor = [147, 51, 234]; // Purple-600
-      const darkGray = [31, 41, 55]; // Gray-800
-      const lightGray = [249, 250, 251]; // Gray-50
-      const textGray = [107, 114, 128]; // Gray-500
+      const primaryColor = [59, 130, 246];
+      const secondaryColor = [147, 51, 234];
+      const darkGray = [31, 41, 55];
+      const lightGray = [249, 250, 251];
+      const textGray = [107, 114, 128];
 
       // Header Section
       doc.setFillColor(...primaryColor);
       doc.rect(0, 0, 210, 40, "F");
       
-      // Name
       doc.setTextColor(255, 255, 255);
-      doc.setFontSize(24);
+      doc.setFontSize(18);
       doc.setFont("helvetica", "bold");
-      doc.text(studentData.name, 20, 25);
+      doc.text(name, 20, 25);
       
-      // Title
       doc.setFontSize(12);
       doc.setFont("helvetica", "normal");
-      doc.text(`${studentData.department} Student | ${studentData.college}`, 20, 32);
+      doc.text(headline, 20, 32);
 
       let yPosition = 60;
 
-      // Simple pagination helper to avoid clipping content
       const ensureSpace = (needed = 20) => {
         if (yPosition + needed > 280) {
           doc.addPage();
@@ -95,10 +118,26 @@ const ProfessionalPortfolio = ({ studentData }) => {
         }
       }
 
+      // Objective / About Me from editor
+      if (ed?.objectiveSummary) {
+        doc.setTextColor(...darkGray);
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        ensureSpace(18);
+        doc.text("Career Objective", 20, yPosition);
+        yPosition += 8;
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        const objLines = doc.splitTextToSize(ed.objectiveSummary, 170);
+        doc.text(objLines, 20, yPosition);
+        yPosition += objLines.length * 5 + 8;
+      }
+
       // Contact Information
       doc.setTextColor(...darkGray);
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
+      ensureSpace(18);
       doc.text("Contact Information", 20, yPosition);
       yPosition += 10;
 
@@ -122,55 +161,65 @@ const ProfessionalPortfolio = ({ studentData }) => {
       }
       yPosition += 10;
 
-      // Education
+      // Education (from editor if available, else DB)
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       ensureSpace(18);
       doc.text("Education", 20, yPosition);
       yPosition += 10;
 
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.text(`${studentData.department}`, 20, yPosition);
-      yPosition += 6;
-      doc.text(`${studentData.college}`, 20, yPosition);
-      yPosition += 6;
-      doc.text(`Year: ${studentData.year} | Semester: ${studentData.semester}`, 20, yPosition);
-      yPosition += 6;
-      if (profileData?.overallCGPA > 0) {
-        doc.text(`CGPA: ${profileData.overallCGPA}`, 20, yPosition);
-        yPosition += 6;
+      if (editorEducation) {
+        editorEducation.forEach((edu) => {
+          ensureSpace(22);
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "bold");
+          doc.text(`${edu.degree || ''} ${edu.field ? `in ${edu.field}` : ''}`.trim() || 'Degree', 20, yPosition);
+          yPosition += 6;
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          if (edu.institution) { doc.text(edu.institution, 20, yPosition); yPosition += 5; }
+          const period = [edu.startYear, edu.endYear].filter(Boolean).join(' – ');
+          if (period) { doc.text(period, 20, yPosition); yPosition += 5; }
+          if (edu.gpa) { doc.text(`GPA: ${edu.gpa}`, 20, yPosition); yPosition += 5; }
+          if (edu.description) {
+            const desc = doc.splitTextToSize(edu.description, 170);
+            doc.text(desc, 20, yPosition);
+            yPosition += desc.length * 4;
+          }
+          yPosition += 4;
+        });
+      } else {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(department, 20, yPosition); yPosition += 6;
+        doc.text(college, 20, yPosition); yPosition += 6;
+        doc.text(`Year: ${year} | Semester: ${semester}`, 20, yPosition); yPosition += 6;
+        if (profileData?.overallCGPA > 0) {
+          doc.text(`CGPA: ${profileData.overallCGPA}`, 20, yPosition); yPosition += 6;
+        }
       }
       yPosition += 10;
 
-      // Internships
-      const internshipCerts = academicCertificates.filter(
-        (cert) => cert.status === 'approved' && cert.domain === 'internship'
-      );
-      if (internshipCerts.length > 0) {
+      // Experience from editor
+      if (editorExperience.length > 0) {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         ensureSpace(18);
-        doc.text("Internships", 20, yPosition);
+        doc.text("Experience", 20, yPosition);
         yPosition += 10;
 
-        internshipCerts.slice(0, 4).forEach((cert, index) => {
+        editorExperience.forEach((exp, index) => {
           ensureSpace(24);
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
-          doc.text(`${index + 1}. ${cert.certificateName}`, 20, yPosition);
+          doc.text(`${index + 1}. ${exp.title || 'Role'}${exp.company ? ` at ${exp.company}` : ''}`, 20, yPosition);
           yPosition += 6;
-
           doc.setFontSize(9);
           doc.setFont("helvetica", "normal");
-          doc.text(`Organization: ${cert.issuedBy || 'N/A'}`, 20, yPosition);
-          yPosition += 4;
-          if (cert.date) {
-            doc.text(`Date: ${new Date(cert.date).toLocaleDateString()}`, 20, yPosition);
-            yPosition += 4;
-          }
-          if (cert.description) {
-            const desc = doc.splitTextToSize(cert.description, 170);
+          const dateLine = [exp.location, exp.startDate && `${exp.startDate} – ${exp.current ? 'Present' : (exp.endDate || '')}`].filter(Boolean).join(' | ');
+          if (dateLine) { doc.text(dateLine, 20, yPosition); yPosition += 5; }
+          if (exp.description) {
+            const desc = doc.splitTextToSize(exp.description, 170);
             doc.text(desc, 20, yPosition);
             yPosition += desc.length * 4;
           }
@@ -178,58 +227,87 @@ const ProfessionalPortfolio = ({ studentData }) => {
         });
       }
 
+      // Internships from certificates (only if no experience in editor)
+      if (editorExperience.length === 0) {
+        const internshipCerts = (academicCertificates || []).filter(
+          (cert) => cert && cert.status === 'approved' && cert.domain === 'internship'
+        );
+        if (internshipCerts.length > 0) {
+          doc.setFontSize(14);
+          doc.setFont("helvetica", "bold");
+          ensureSpace(18);
+          doc.text("Internships", 20, yPosition);
+          yPosition += 10;
+
+          internshipCerts.slice(0, 4).forEach((cert, index) => {
+            ensureSpace(24);
+            doc.setFontSize(11);
+            doc.setFont("helvetica", "bold");
+            doc.text(`${index + 1}. ${cert.certificateName || 'Untitled'}`, 20, yPosition);
+            yPosition += 6;
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            if (cert.issuedBy) { doc.text(`Organization: ${cert.issuedBy}`, 20, yPosition); yPosition += 4; }
+            if (cert.date) { doc.text(`Date: ${new Date(cert.date).toLocaleDateString()}`, 20, yPosition); yPosition += 4; }
+            if (cert.description) {
+              const desc = doc.splitTextToSize(String(cert.description), 170);
+              doc.text(desc, 20, yPosition); yPosition += desc.length * 4;
+            }
+            yPosition += 6;
+          });
+        }
+      }
+
       // Technical Skills
-      const approvedSkills = Object.keys(skills);
-      if (approvedSkills.length > 0) {
+      if (mergedSkills.length > 0) {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         ensureSpace(18);
         doc.text("Technical Skills", 20, yPosition);
         yPosition += 10;
-
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        const skillsText = approvedSkills.join(', ');
+        const skillsText = mergedSkills.join(', ');
         const splitSkills = doc.splitTextToSize(skillsText, 170);
         doc.text(splitSkills, 20, yPosition);
         yPosition += splitSkills.length * 6 + 10;
       }
 
-      // Projects
-      if (projects.length > 0) {
+      // Projects (editor projects or DB projects)
+      if (mergedProjects.length > 0) {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
         ensureSpace(18);
         doc.text("Projects", 20, yPosition);
         yPosition += 10;
 
-        projects.slice(0, 5).forEach((project, index) => {
+        mergedProjects.slice(0, 5).forEach((project, index) => {
+          if (!project) return;
           ensureSpace(28);
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
-          doc.text(`${index + 1}. ${project.title}`, 20, yPosition);
+          doc.text(`${index + 1}. ${project.title || 'Untitled Project'}`, 20, yPosition);
           yPosition += 6;
-
           doc.setFontSize(9);
           doc.setFont("helvetica", "normal");
-          const description = doc.splitTextToSize(project.description, 170);
-          doc.text(description, 20, yPosition);
-          yPosition += description.length * 4 + 4;
-
-          if (project.githubLink) {
-            doc.text(`GitHub: ${project.githubLink}`, 20, yPosition);
+          // Show technologies if from editor
+          if (project.technologies) {
+            doc.text(`Tech: ${project.technologies}`, 20, yPosition);
             yPosition += 4;
           }
-          if (project.deployLink) {
-            doc.text(`Live Demo: ${project.deployLink}`, 20, yPosition);
-            yPosition += 4;
+          if (project.description) {
+            const description = doc.splitTextToSize(String(project.description), 170);
+            doc.text(description, 20, yPosition);
+            yPosition += description.length * 4 + 4;
           }
+          if (project.githubLink) { doc.text(`GitHub: ${project.githubLink}`, 20, yPosition); yPosition += 4; }
+          if (project.deployLink) { doc.text(`Live Demo: ${project.deployLink}`, 20, yPosition); yPosition += 4; }
           yPosition += 6;
         });
       }
 
       // Certifications
-      const approvedCerts = academicCertificates.filter(cert => cert.status === 'approved');
+      const approvedCerts = (academicCertificates || []).filter(cert => cert && cert.status === 'approved');
       if (approvedCerts.length > 0) {
         doc.setFontSize(14);
         doc.setFont("helvetica", "bold");
@@ -241,18 +319,68 @@ const ProfessionalPortfolio = ({ studentData }) => {
           ensureSpace(22);
           doc.setFontSize(11);
           doc.setFont("helvetica", "bold");
-          doc.text(`${index + 1}. ${cert.certificateName}`, 20, yPosition);
+          doc.text(`${index + 1}. ${cert.certificateName || 'Untitled'}`, 20, yPosition);
           yPosition += 6;
-
           doc.setFontSize(9);
           doc.setFont("helvetica", "normal");
-          doc.text(`Issued by: ${cert.issuedBy}`, 20, yPosition);
+          if (cert.issuedBy) { doc.text(`Issued by: ${cert.issuedBy}`, 20, yPosition); yPosition += 4; }
+          if (cert.date) { doc.text(`Date: ${new Date(cert.date).toLocaleDateString()}`, 20, yPosition); yPosition += 4; }
+          if (cert.domain) { doc.text(`Domain: ${cert.domain.charAt(0).toUpperCase() + cert.domain.slice(1)}`, 20, yPosition); yPosition += 4; }
           yPosition += 4;
-          doc.text(`Date: ${new Date(cert.date).toLocaleDateString()}`, 20, yPosition);
-          yPosition += 4;
-          doc.text(`Domain: ${cert.domain.charAt(0).toUpperCase() + cert.domain.slice(1)}`, 20, yPosition);
-          yPosition += 8;
         });
+      }
+
+      // Awards from editor
+      if (editorAwards.length > 0) {
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        ensureSpace(18);
+        doc.text("Awards & Achievements", 20, yPosition);
+        yPosition += 10;
+
+        editorAwards.forEach((award, index) => {
+          ensureSpace(16);
+          doc.setFontSize(11);
+          doc.setFont("helvetica", "bold");
+          doc.text(`${index + 1}. ${award.title || 'Award'}`, 20, yPosition);
+          yPosition += 6;
+          doc.setFontSize(9);
+          doc.setFont("helvetica", "normal");
+          const meta = [award.issuer, award.date].filter(Boolean).join(' | ');
+          if (meta) { doc.text(meta, 20, yPosition); yPosition += 4; }
+          if (award.description) {
+            const desc = doc.splitTextToSize(award.description, 170);
+            doc.text(desc, 20, yPosition);
+            yPosition += desc.length * 4;
+          }
+          yPosition += 4;
+        });
+      }
+
+      // Languages & Hobbies from editor
+      if (ed?.languages?.length > 0 || ed?.hobbies?.length > 0) {
+        ensureSpace(18);
+        if (ed?.languages?.length > 0) {
+          doc.setFontSize(14);
+          doc.setFont("helvetica", "bold");
+          doc.text("Languages", 20, yPosition);
+          yPosition += 8;
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.text(ed.languages.join(', '), 20, yPosition);
+          yPosition += 10;
+        }
+        if (ed?.hobbies?.length > 0) {
+          ensureSpace(14);
+          doc.setFontSize(14);
+          doc.setFont("helvetica", "bold");
+          doc.text("Hobbies & Interests", 20, yPosition);
+          yPosition += 8;
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "normal");
+          doc.text(ed.hobbies.join(', '), 20, yPosition);
+          yPosition += 10;
+        }
       }
 
       // Footer
@@ -263,8 +391,9 @@ const ProfessionalPortfolio = ({ studentData }) => {
       doc.setFont("helvetica", "normal");
       doc.text("Generated by Smart Student Hub", 20, 290);
 
-      // Save the PDF
-      doc.save(`${studentData.name}_Professional_Portfolio.pdf`);
+      // Save the PDF (sanitize filename)
+      const safeName = name.replace(/[^a-z0-9-_\. ]/gi, '_');
+      doc.save(`${safeName}_Professional_Portfolio.pdf`);
     } catch (error) {
       console.error('Error generating portfolio:', error);
       alert('Error generating portfolio. Please try again.');
@@ -275,12 +404,24 @@ const ProfessionalPortfolio = ({ studentData }) => {
     try {
       const { jsPDF } = await import("jspdf");
       const doc = new jsPDF();
+      const ed = portfolioEditorData;
       
+      // Safe access helpers - use fullStudentData which has complete info from DB
+      const name = fullStudentData?.name || studentData?.name || 'Student';
+      const department = fullStudentData?.department || studentData?.department || 'Department';
+      const college = fullStudentData?.college || studentData?.college || 'College';
+      const year = fullStudentData?.year || studentData?.year || 'N/A';
+      const semester = fullStudentData?.semester || studentData?.semester || 'N/A';
+      const headline = ed?.headline || `${department} Student`;
+      
+      // Merged data
+      const mergedSkills = ed?.customSkills?.length > 0 ? ed.customSkills : Object.keys(skills || {});
+      const mergedProjects = ed?.customProjects?.length > 0 ? ed.customProjects : (projects || []);
+      const editorEducation = ed?.education?.length > 0 ? ed.education : null;
+      const editorExperience = ed?.experience || [];
+
       // Colors
-      const darkGray = [31, 41, 55]; // Gray-800
-      const lightGray = [249, 250, 251]; // Gray-50
-      const primaryColor = [59, 130, 246]; // Blue-500
-      const textGray = [107, 114, 128]; // Gray-500
+      const darkGray = [31, 41, 55];
 
       // Left Sidebar (Dark)
       doc.setFillColor(...darkGray);
@@ -303,153 +444,237 @@ const ProfessionalPortfolio = ({ studentData }) => {
       
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
-      if (profileData?.mobileNumber) {
-        doc.text(profileData.mobileNumber, 10, 88);
-      }
-      if (profileData?.collegeEmail) {
-        doc.text(profileData.collegeEmail, 10, 96);
-      }
-      if (profileData?.linkedinProfile) {
-        doc.text("LinkedIn", 10, 104);
-      }
-      if (profileData?.githubProfile) {
-        doc.text("GitHub", 10, 112);
-      }
+      let sideY = 88;
+      if (profileData?.mobileNumber) { doc.text(String(profileData.mobileNumber), 10, sideY); sideY += 8; }
+      if (profileData?.collegeEmail) { doc.text(String(profileData.collegeEmail), 10, sideY); sideY += 8; }
+      if (profileData?.linkedinProfile) { doc.text("LinkedIn", 10, sideY); sideY += 8; }
+      if (profileData?.githubProfile) { doc.text("GitHub", 10, sideY); sideY += 8; }
+      sideY += 8;
 
       // Skills in Sidebar
-      const approvedSkills = Object.keys(skills);
-      if (approvedSkills.length > 0) {
+      if (mergedSkills.length > 0) {
         doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
-        doc.text("SKILLS", 10, 130);
-        
+        doc.text("SKILLS", 10, sideY);
+        sideY += 8;
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
-        approvedSkills.slice(0, 15).forEach((skill, index) => {
-          doc.text(`• ${skill}`, 10, 138 + (index * 6));
+        mergedSkills.slice(0, 15).forEach((skill) => {
+          doc.text(`• ${skill}`, 10, sideY);
+          sideY += 6;
+        });
+        sideY += 6;
+      }
+
+      // Languages in sidebar
+      if (ed?.languages?.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("LANGUAGES", 10, sideY);
+        sideY += 8;
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        ed.languages.forEach((lang) => {
+          doc.text(`• ${lang}`, 10, sideY);
+          sideY += 6;
+        });
+        sideY += 6;
+      }
+
+      // Hobbies in sidebar
+      if (ed?.hobbies?.length > 0) {
+        doc.setFontSize(12);
+        doc.setFont("helvetica", "bold");
+        doc.text("HOBBIES", 10, sideY);
+        sideY += 8;
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        ed.hobbies.forEach((h) => {
+          doc.text(`• ${h}`, 10, sideY);
+          sideY += 6;
         });
       }
 
       // Main Content Area
       doc.setTextColor(...darkGray);
       
-      // Name and Title
-      doc.setFontSize(20);
+      // Name and Title - handle overflow
+      const maxNameWidth = 120;
+      let nameFontSize = 20;
       doc.setFont("helvetica", "bold");
-      doc.text(studentData.name, 80, 30);
+      doc.setFontSize(nameFontSize);
       
-      doc.setFontSize(12);
+      let nameWidth = doc.getTextWidth(name);
+      while (nameWidth > maxNameWidth && nameFontSize > 12) {
+        nameFontSize -= 2;
+        doc.setFontSize(nameFontSize);
+        nameWidth = doc.getTextWidth(name);
+      }
+      
+      let nameYEnd = 30;
+      if (nameWidth > maxNameWidth) {
+        const nameLines = doc.splitTextToSize(name, maxNameWidth);
+        doc.text(nameLines, 80, 30);
+        nameYEnd = 30 + (nameLines.length - 1) * (nameFontSize * 0.4);
+      } else {
+        doc.text(name, 80, 30);
+      }
+      
+      doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
-      doc.text(`${studentData.department} Student`, 80, 38);
-      doc.text(studentData.college, 80, 46);
+      doc.text(headline, 80, nameYEnd + 8);
 
-      let yPosition = 70;
+      let yPosition = Math.max(55, nameYEnd + 18);
+
+      // Objective from editor
+      if (ed?.objectiveSummary) {
+        doc.setFontSize(13);
+        doc.setFont("helvetica", "bold");
+        doc.text("OBJECTIVE", 80, yPosition);
+        yPosition += 8;
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "normal");
+        const objLines = doc.splitTextToSize(ed.objectiveSummary, 120);
+        doc.text(objLines, 80, yPosition);
+        yPosition += objLines.length * 4 + 8;
+      }
 
       // Education
-      doc.setFontSize(14);
+      doc.setFontSize(13);
       doc.setFont("helvetica", "bold");
       doc.text("EDUCATION", 80, yPosition);
-      yPosition += 10;
+      yPosition += 8;
 
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text(`${studentData.department}`, 80, yPosition);
-      yPosition += 6;
-      
-      doc.setFont("helvetica", "normal");
-      doc.text(`${studentData.college}`, 80, yPosition);
-      yPosition += 6;
-      doc.text(`Year: ${studentData.year} | Semester: ${studentData.semester}`, 80, yPosition);
-      yPosition += 6;
-      if (profileData?.overallCGPA > 0) {
-        doc.text(`CGPA: ${profileData.overallCGPA}`, 80, yPosition);
-        yPosition += 6;
-      }
-      yPosition += 10;
-
-      // Internships
-      const resumeInternships = academicCertificates.filter(
-        (cert) => cert.status === 'approved' && cert.domain === 'internship'
-      );
-      if (resumeInternships.length > 0) {
-        doc.setFontSize(14);
-        doc.setFont("helvetica", "bold");
-        doc.text("INTERNSHIPS", 80, yPosition);
-        yPosition += 10;
-
-        resumeInternships.slice(0, 4).forEach((cert) => {
-          doc.setFontSize(11);
+      if (editorEducation) {
+        editorEducation.forEach((edu) => {
+          doc.setFontSize(10);
           doc.setFont("helvetica", "bold");
-          doc.text(cert.certificateName, 80, yPosition);
-          yPosition += 6;
+          doc.text(`${edu.degree || ''} ${edu.field ? `in ${edu.field}` : ''}`.trim() || department, 80, yPosition);
+          yPosition += 5;
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(9);
+          if (edu.institution) { doc.text(edu.institution, 80, yPosition); yPosition += 5; }
+          const period = [edu.startYear, edu.endYear].filter(Boolean).join(' – ');
+          if (period) { doc.text(period, 80, yPosition); yPosition += 5; }
+          if (edu.gpa) { doc.text(`GPA: ${edu.gpa}`, 80, yPosition); yPosition += 5; }
+          yPosition += 4;
+        });
+      } else {
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.text(department, 80, yPosition); yPosition += 6;
+        doc.setFont("helvetica", "normal");
+        doc.text(college, 80, yPosition); yPosition += 6;
+        doc.text(`Year: ${year} | Semester: ${semester}`, 80, yPosition); yPosition += 6;
+        if (profileData?.overallCGPA > 0) { doc.text(`CGPA: ${profileData.overallCGPA}`, 80, yPosition); yPosition += 6; }
+      }
+      yPosition += 6;
 
+      // Experience from editor
+      if (editorExperience.length > 0) {
+        doc.setFontSize(13);
+        doc.setFont("helvetica", "bold");
+        doc.text("EXPERIENCE", 80, yPosition);
+        yPosition += 8;
+
+        editorExperience.forEach((exp) => {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          doc.text(`${exp.title || 'Role'}${exp.company ? ` — ${exp.company}` : ''}`, 80, yPosition);
+          yPosition += 5;
           doc.setFontSize(9);
           doc.setFont("helvetica", "normal");
-          doc.text(`${cert.issuedBy || 'N/A'}${cert.date ? ' | ' + new Date(cert.date).toLocaleDateString() : ''}`, 80, yPosition);
-          yPosition += 6;
-          if (cert.description) {
-            const desc = doc.splitTextToSize(cert.description, 120);
+          const meta = [exp.location, exp.startDate && `${exp.startDate} – ${exp.current ? 'Present' : (exp.endDate || '')}`].filter(Boolean).join(' | ');
+          if (meta) { doc.text(meta, 80, yPosition); yPosition += 5; }
+          if (exp.description) {
+            const desc = doc.splitTextToSize(exp.description, 120);
             doc.text(desc, 80, yPosition);
             yPosition += desc.length * 4;
           }
           yPosition += 6;
         });
+      } else {
+        // Internships from certificates
+        const resumeInternships = (academicCertificates || []).filter(
+          (cert) => cert && cert.status === 'approved' && cert.domain === 'internship'
+        );
+        if (resumeInternships.length > 0) {
+          doc.setFontSize(13);
+          doc.setFont("helvetica", "bold");
+          doc.text("INTERNSHIPS", 80, yPosition);
+          yPosition += 8;
+
+          resumeInternships.slice(0, 4).forEach((cert) => {
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.text(cert.certificateName || 'Untitled', 80, yPosition);
+            yPosition += 5;
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "normal");
+            const dateStr = cert.date ? new Date(cert.date).toLocaleDateString() : '';
+            doc.text(`${cert.issuedBy || 'N/A'}${dateStr ? ' | ' + dateStr : ''}`, 80, yPosition);
+            yPosition += 5;
+            if (cert.description) {
+              const desc = doc.splitTextToSize(String(cert.description), 120);
+              doc.text(desc, 80, yPosition);
+              yPosition += desc.length * 4;
+            }
+            yPosition += 5;
+          });
+        }
       }
 
       // Projects
-      if (projects.length > 0) {
-        doc.setFontSize(14);
+      if (mergedProjects.length > 0) {
+        doc.setFontSize(13);
         doc.setFont("helvetica", "bold");
         doc.text("PROJECTS", 80, yPosition);
-        yPosition += 10;
+        yPosition += 8;
 
-        projects.slice(0, 4).forEach((project, index) => {
-          doc.setFontSize(11);
+        mergedProjects.slice(0, 4).forEach((project) => {
+          if (!project) return;
+          doc.setFontSize(10);
           doc.setFont("helvetica", "bold");
-          doc.text(project.title, 80, yPosition);
-          yPosition += 6;
-
+          doc.text(project.title || 'Untitled Project', 80, yPosition);
+          yPosition += 5;
           doc.setFontSize(9);
           doc.setFont("helvetica", "normal");
-          const description = doc.splitTextToSize(project.description, 120);
-          doc.text(description, 80, yPosition);
-          yPosition += description.length * 4 + 4;
-
-          if (project.githubLink) {
-            doc.text(`GitHub: ${project.githubLink}`, 80, yPosition);
-            yPosition += 4;
+          if (project.technologies) { doc.text(`Tech: ${project.technologies}`, 80, yPosition); yPosition += 4; }
+          if (project.description) {
+            const description = doc.splitTextToSize(String(project.description), 120);
+            doc.text(description, 80, yPosition);
+            yPosition += description.length * 4 + 2;
           }
-          if (project.deployLink) {
-            doc.text(`Live Demo: ${project.deployLink}`, 80, yPosition);
-            yPosition += 4;
-          }
-          yPosition += 6;
+          if (project.githubLink) { doc.text(`GitHub: ${project.githubLink}`, 80, yPosition); yPosition += 4; }
+          if (project.deployLink) { doc.text(`Live Demo: ${project.deployLink}`, 80, yPosition); yPosition += 4; }
+          yPosition += 5;
         });
       }
 
       // Certifications
-      const approvedCerts = academicCertificates.filter(cert => cert.status === 'approved');
+      const approvedCerts = (academicCertificates || []).filter(cert => cert && cert.status === 'approved');
       if (approvedCerts.length > 0) {
-        doc.setFontSize(14);
+        doc.setFontSize(13);
         doc.setFont("helvetica", "bold");
         doc.text("CERTIFICATIONS", 80, yPosition);
-        yPosition += 10;
+        yPosition += 8;
 
-        approvedCerts.slice(0, 4).forEach((cert, index) => {
-          doc.setFontSize(11);
+        approvedCerts.slice(0, 4).forEach((cert) => {
+          doc.setFontSize(10);
           doc.setFont("helvetica", "bold");
-          doc.text(cert.certificateName, 80, yPosition);
-          yPosition += 6;
-
+          doc.text(cert.certificateName || 'Untitled', 80, yPosition);
+          yPosition += 5;
           doc.setFontSize(9);
           doc.setFont("helvetica", "normal");
-          doc.text(`${cert.issuedBy} | ${new Date(cert.date).toLocaleDateString()}`, 80, yPosition);
+          const dateStr = cert.date ? new Date(cert.date).toLocaleDateString() : 'N/A';
+          doc.text(`${cert.issuedBy || 'N/A'} | ${dateStr}`, 80, yPosition);
           yPosition += 6;
         });
       }
 
-      // Save the PDF
-      doc.save(`${studentData.name}_Professional_Resume.pdf`);
+      // Save the PDF (sanitize filename)
+      const safeName = name.replace(/[^a-z0-9-_\. ]/gi, '_');
+      doc.save(`${safeName}_Professional_Resume.pdf`);
     } catch (error) {
       console.error('Error generating resume:', error);
       alert('Error generating resume. Please try again.');
@@ -457,13 +682,31 @@ const ProfessionalPortfolio = ({ studentData }) => {
   };
 
   const generateWebPortfolio = () => {
+    const ed = portfolioEditorData;
+    // Safe access helpers - use fullStudentData which has complete info from DB
+    const name = fullStudentData?.name || studentData?.name || 'Student';
+    const department = fullStudentData?.department || studentData?.department || '';
+    const college = fullStudentData?.college || studentData?.college || '';
+    const year = fullStudentData?.year || studentData?.year || '';
+    const semester = fullStudentData?.semester || studentData?.semester || '';
+    const headline = ed?.headline || (department ? `${department} Student` : 'Student');
+
+    // Merged data from editor or DB
+    const mergedSkills = ed?.customSkills?.length > 0 ? ed.customSkills : Object.keys(skills || {});
+    const mergedProjects = ed?.customProjects?.length > 0 ? ed.customProjects : (projects || []).filter(p => p);
+    const safeAcademicCerts = (academicCertificates || []).filter(cert => cert);
+    const editorEducation = ed?.education?.length > 0 ? ed.education : null;
+    const editorExperience = ed?.experience || [];
+    const editorAwards = ed?.awards || [];
+    const aboutMe = ed?.aboutMe || `I am a dedicated ${department || 'technology'} student${college ? ` at ${college}` : ''}${year ? `, currently in year ${year}` : ''}${semester ? `, semester ${semester}` : ''}. ${profileData?.overallCGPA > 0 ? `I maintain a CGPA of ${profileData.overallCGPA}.` : ''} I am passionate about technology and continuously work on projects to enhance my skills.`;
+
     const portfolioHTML = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${studentData.name} - Professional Portfolio</title>
+    <title>${name} - Professional Portfolio</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
@@ -478,6 +721,7 @@ const ProfessionalPortfolio = ({ studentData }) => {
         .skill-tag { background: #667eea; color: white; padding: 8px 16px; border-radius: 20px; font-size: 0.9rem; }
         .project { margin: 20px 0; padding: 20px; border-left: 4px solid #667eea; background: #f8f9fa; }
         .project h3 { color: #333; margin-bottom: 10px; }
+        .project .tech { color: #667eea; font-size: 0.85rem; margin-bottom: 8px; }
         .project-links { margin-top: 10px; }
         .project-links a { color: #667eea; text-decoration: none; margin-right: 15px; }
         .certificate { margin: 15px 0; padding: 15px; background: #e8f4fd; border-radius: 8px; }
@@ -488,14 +732,19 @@ const ProfessionalPortfolio = ({ studentData }) => {
         .edu-list { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
         .edu-item { background: #f8f9ff; border-left: 4px solid #667eea; padding: 12px 14px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.04); }
         .edu-item strong { color: #333; }
+        .experience { margin: 15px 0; padding: 15px; border-left: 4px solid #764ba2; background: #faf5ff; border-radius: 8px; }
+        .experience h4 { color: #333; margin-bottom: 5px; }
+        .experience .meta { color: #888; font-size: 0.85rem; }
+        .tag-list { display: flex; flex-wrap: wrap; gap: 8px; }
+        .tag { background: #f0f0f0; color: #555; padding: 4px 12px; border-radius: 12px; font-size: 0.85rem; }
         @media (max-width: 768px) { .header h1 { font-size: 2rem; } .contact-info { flex-direction: column; gap: 10px; } }
     </style>
 </head>
 <body>
     <div class="header">
-        ${profileData?.profileImage ? `<img src="${profileData.profileImage}" alt="${studentData.name}" class="profile-img">` : ''}
-        <h1>${studentData.name}</h1>
-        <p>${studentData.department} Student | ${studentData.college}</p>
+        ${profileData?.profileImage ? `<img src="${profileData.profileImage}" alt="${name}" class="profile-img">` : ''}
+        <h1>${name}</h1>
+        <p>${headline}${college ? ` | ${college}` : ''}</p>
         <div class="contact-info">
             ${profileData?.mobileNumber ? `<a href="tel:${profileData.mobileNumber}">📞 ${profileData.mobileNumber}</a>` : ''}
             ${profileData?.collegeEmail ? `<a href="mailto:${profileData.collegeEmail}">✉️ ${profileData.collegeEmail}</a>` : ''}
@@ -505,53 +754,87 @@ const ProfessionalPortfolio = ({ studentData }) => {
     </div>
 
     <div class="container">
+        ${ed?.objectiveSummary ? `
+        <div class="section">
+            <h2>Career Objective</h2>
+            <p>${ed.objectiveSummary}</p>
+        </div>
+        ` : ''}
+
         <div class="section">
             <h2>About Me</h2>
-            <p>I am a dedicated ${studentData.department} student at ${studentData.college}, currently in year ${studentData.year}, semester ${studentData.semester}. 
-            ${profileData?.overallCGPA > 0 ? `I maintain a CGPA of ${profileData.overallCGPA}.` : ''} 
-            I am passionate about technology and continuously work on projects to enhance my skills.</p>
+            <p>${aboutMe}</p>
         </div>
 
         <div class="section">
           <h2>Education</h2>
+          ${editorEducation ? `
+          ${editorEducation.map(edu => `
+            <div class="certificate">
+              <h4>${edu.degree || ''} ${edu.field ? 'in ' + edu.field : ''}</h4>
+              ${edu.institution ? `<p><strong>Institution:</strong> ${edu.institution}</p>` : ''}
+              ${edu.startYear || edu.endYear ? `<p>${edu.startYear || ''} – ${edu.endYear || ''}</p>` : ''}
+              ${edu.gpa ? `<p><strong>GPA:</strong> ${edu.gpa}</p>` : ''}
+              ${edu.description ? `<p>${edu.description}</p>` : ''}
+            </div>
+          `).join('')}
+          ` : `
           <ul class="edu-list">
-            <li class="edu-item"><strong>College:</strong> ${studentData.college || 'N/A'}</li>
-            <li class="edu-item"><strong>Program / Dept:</strong> ${studentData.department || 'N/A'}</li>
-            <li class="edu-item"><strong>Year & Semester:</strong> ${studentData.year || 'N/A'} | ${studentData.semester ? `Semester ${studentData.semester}` : 'Semester N/A'}</li>
+            ${college ? `<li class="edu-item"><strong>College:</strong> ${college}</li>` : ''}
+            ${department ? `<li class="edu-item"><strong>Program / Dept:</strong> ${department}</li>` : ''}
+            ${year || semester ? `<li class="edu-item"><strong>Year & Semester:</strong> ${year ? 'Year ' + year : ''}${year && semester ? ' | ' : ''}${semester ? 'Semester ' + semester : ''}</li>` : ''}
             ${profileData?.overallCGPA > 0 ? `<li class="edu-item"><strong>Overall CGPA:</strong> ${profileData.overallCGPA}</li>` : ''}
             ${profileData?.currentSGPA > 0 ? `<li class="edu-item"><strong>Current SGPA:</strong> ${profileData.currentSGPA}</li>` : ''}
           </ul>
+          `}
         </div>
 
-        ${academicCertificates.filter(cert => cert.status === 'approved' && cert.domain === 'internship').length > 0 ? `
+        ${editorExperience.length > 0 ? `
+        <div class="section">
+          <h2>Experience</h2>
+          ${editorExperience.map(exp => `
+            <div class="experience">
+              <h4>${exp.title || 'Role'}${exp.company ? ' at ' + exp.company : ''}</h4>
+              <p class="meta">${[exp.location, exp.startDate && (exp.startDate + ' – ' + (exp.current ? 'Present' : (exp.endDate || '')))].filter(Boolean).join(' | ')}</p>
+              ${exp.description ? `<p>${exp.description}</p>` : ''}
+            </div>
+          `).join('')}
+        </div>
+        ` : `
+        ${safeAcademicCerts.filter(cert => cert.status === 'approved' && cert.domain === 'internship').length > 0 ? `
         <div class="section">
           <h2>Internships</h2>
-          ${academicCertificates
+          ${safeAcademicCerts
             .filter(cert => cert.status === 'approved' && cert.domain === 'internship')
             .map(cert => `
               <div class="certificate">
-                <h4>${cert.certificateName}</h4>
-                <p><strong>Organization:</strong> ${cert.issuedBy || 'N/A'}</p>
+                <h4>${cert.certificateName || 'Untitled'}</h4>
+                ${cert.issuedBy ? `<p><strong>Organization:</strong> ${cert.issuedBy}</p>` : ''}
                 ${cert.date ? `<p><strong>Date:</strong> ${new Date(cert.date).toLocaleDateString()}</p>` : ''}
                 ${cert.description ? `<p><strong>Description:</strong> ${cert.description}</p>` : ''}
               </div>
             `).join('')}
         </div>
         ` : ''}
+        `}
 
+        ${mergedSkills.length > 0 ? `
         <div class="section">
             <h2>Technical Skills</h2>
             <div class="skills">
-                ${Object.keys(skills).map(skill => `<span class="skill-tag">${skill}</span>`).join('')}
+                ${mergedSkills.map(skill => `<span class="skill-tag">${skill}</span>`).join('')}
             </div>
         </div>
+        ` : ''}
 
+        ${mergedProjects.length > 0 ? `
         <div class="section">
             <h2>Projects</h2>
-            ${projects.map(project => `
+            ${mergedProjects.map(project => `
                 <div class="project">
-                    <h3>${project.title}</h3>
-                    <p>${project.description}</p>
+                    <h3>${project.title || 'Untitled Project'}</h3>
+                    ${project.technologies ? `<p class="tech">🛠 ${project.technologies}</p>` : ''}
+                    ${project.description ? `<p>${project.description}</p>` : ''}
                     <div class="project-links">
                         ${project.githubLink ? `<a href="${project.githubLink}" target="_blank">🔗 GitHub</a>` : ''}
                         ${project.deployLink ? `<a href="${project.deployLink}" target="_blank">🚀 Live Demo</a>` : ''}
@@ -559,19 +842,42 @@ const ProfessionalPortfolio = ({ studentData }) => {
                 </div>
             `).join('')}
         </div>
+        ` : ''}
 
+        ${safeAcademicCerts.filter(cert => cert.status === 'approved').length > 0 ? `
         <div class="section">
             <h2>Certifications</h2>
-            ${academicCertificates.filter(cert => cert.status === 'approved').map(cert => `
+            ${safeAcademicCerts.filter(cert => cert.status === 'approved').map(cert => `
                 <div class="certificate">
-                    <h4>${cert.certificateName}</h4>
-                    <p><strong>Issued by:</strong> ${cert.issuedBy}</p>
-                    <p><strong>Date:</strong> ${new Date(cert.date).toLocaleDateString()}</p>
-                    <p><strong>Domain:</strong> ${cert.domain.charAt(0).toUpperCase() + cert.domain.slice(1)}</p>
+                    <h4>${cert.certificateName || 'Untitled'}</h4>
+                    ${cert.issuedBy ? `<p><strong>Issued by:</strong> ${cert.issuedBy}</p>` : ''}
+                    ${cert.date ? `<p><strong>Date:</strong> ${new Date(cert.date).toLocaleDateString()}</p>` : ''}
+                    ${cert.domain ? `<p><strong>Domain:</strong> ${cert.domain.charAt(0).toUpperCase() + cert.domain.slice(1)}</p>` : ''}
                     ${cert.description ? `<p><strong>Description:</strong> ${cert.description}</p>` : ''}
                 </div>
             `).join('')}
         </div>
+        ` : ''}
+
+        ${editorAwards.length > 0 ? `
+        <div class="section">
+            <h2>Awards & Achievements</h2>
+            ${editorAwards.map(a => `
+                <div class="certificate">
+                    <h4>${a.title || 'Award'}</h4>
+                    <p>${[a.issuer, a.date].filter(Boolean).join(' | ')}</p>
+                    ${a.description ? `<p>${a.description}</p>` : ''}
+                </div>
+            `).join('')}
+        </div>
+        ` : ''}
+
+        ${(ed?.languages?.length > 0 || ed?.hobbies?.length > 0) ? `
+        <div class="section" style="display:grid;grid-template-columns:1fr 1fr;gap:30px;">
+            ${ed?.languages?.length > 0 ? `<div><h2 style="font-size:1.5rem;">Languages</h2><div class="tag-list">${ed.languages.map(l => `<span class="tag">${l}</span>`).join('')}</div></div>` : ''}
+            ${ed?.hobbies?.length > 0 ? `<div><h2 style="font-size:1.5rem;">Hobbies</h2><div class="tag-list">${ed.hobbies.map(h => `<span class="tag">${h}</span>`).join('')}</div></div>` : ''}
+        </div>
+        ` : ''}
     </div>
 </body>
 </html>`;
@@ -580,7 +886,7 @@ const ProfessionalPortfolio = ({ studentData }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${studentData.name}_Web_Portfolio.html`;
+    a.download = `${name}_Web_Portfolio.html`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

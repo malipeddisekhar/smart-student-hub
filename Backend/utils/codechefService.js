@@ -1,15 +1,14 @@
-const puppeteer = require('puppeteer');
+const axios = require('axios');
+const cheerio = require('cheerio');
 
 /**
- * Fetch CodeChef stats for a given username using Puppeteer (headless browser)
- * This approach handles JavaScript-rendered content better than static HTML parsing
+ * Fetch CodeChef stats for a given username using axios + cheerio (lightweight HTTP)
+ * Much faster than Puppeteer — no browser launch needed (~1-3s vs 30s+)
  * 
  * @param {string} username - CodeChef username
- * @returns {Promise<object>} Stats object with problemsSolved, rating, globalRank, stars, etc.
+ * @returns {Promise<object>} Stats object with totalSolved, rating, stars, etc.
  */
 const getCodeChefStats = async (username) => {
-  let browser;
-  
   try {
     // Input validation
     if (!username || typeof username !== 'string' || username.trim().length === 0) {
@@ -24,190 +23,106 @@ const getCodeChefStats = async (username) => {
 
     console.log(`🔍 Fetching CodeChef stats for: ${trimmedUsername}`);
 
-    // Launch headless browser with optimized settings
-    browser = await puppeteer.launch({
-      headless: 'new', // Use new headless mode
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--disable-blink-features=AutomationControlled'
-      ],
-      timeout: 30000
+    // Fetch profile page via HTTP (no browser needed — ~1-3s)
+    const { data: html } = await axios.get(profileUrl, {
+      timeout: 10000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5'
+      }
     });
 
-    // Create new page
-    const page = await browser.newPage();
+    const $ = cheerio.load(html);
 
-    // Set viewport and user agent to mimic real browser
-    await page.setViewport({ width: 1920, height: 1080 });
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
-    // Navigate to profile page with network idle wait
-    console.log(`⏳ Loading profile page...`);
-    const response = await page.goto(profileUrl, {
-      waitUntil: 'networkidle2',
-      timeout: 30000
-    });
-
-    // Check if page loaded successfully (404 check)
-    if (response.status() === 404) {
-      console.log(`❌ Profile not found (404)`);
-      await browser.close();
+    // Check if user exists
+    if (html.includes('not exist') && !$('.user-details-container').length) {
+      console.log(`❌ Profile not found`);
       return {
         error: 'Account does not exist',
         type: 'NOT_FOUND'
       };
     }
 
-    // Wait for profile content to load
-    // Check if user profile exists by waiting for username header
-    console.log(`⏳ Waiting for profile content...`);
-    try {
-      await page.waitForSelector('.user-details-container', { timeout: 10000 });
-    } catch (err) {
-      console.log(`❌ Profile container not found`);
-      await browser.close();
+    // Extract username from profile header
+    const usernameEl = $('.user-details-container .h2-style');
+    const profileUsername = usernameEl.length ? usernameEl.text().trim() : null;
+
+    if (!profileUsername) {
       return {
         error: 'Account does not exist',
         type: 'NOT_FOUND'
       };
     }
 
-    // Wait extra 1-2 seconds for JavaScript-rendered stats to fully load
-    console.log(`⏳ Waiting for stats to render...`);
-    await new Promise(resolve => setTimeout(resolve, 3000));
-
-    // Extract stats using page.evaluate() - runs in browser context
-    console.log(`📊 Extracting stats...`);
-    const stats = await page.evaluate(() => {
-      const result = {
-        username: null,
-        totalSolved: 0,
-        isPrivate: false,
-        debug: [] // For debugging what we found
-      };
-
-      // Extract username from profile header
-      const usernameElement = document.querySelector('.user-details-container .h2-style');
-      if (usernameElement) {
-        result.username = usernameElement.textContent.trim();
-      }
-
-      // ========================================
-      // SIMPLIFIED PROBLEMS SOLVED EXTRACTION
-      // Focus on what actually works on CodeChef
-      // ========================================
-      let problemsCount = 0;
-      
-      // Primary Method: Look for "Total Problems Solved:" h3 element
-      const bodyText = document.body.innerText || document.body.textContent || '';
-      const totalSolvedMatch = bodyText.match(/Total\s+Problems\s+Solved:\s*(\d+)/i);
-      if (totalSolvedMatch && totalSolvedMatch[1]) {
-        problemsCount = parseInt(totalSolvedMatch[1], 10);
-        result.debug.push('Found via "Total Problems Solved" pattern: ' + problemsCount);
-      }
-
-      // Fallback Method 1: Look for h3 containing "Total Problems Solved"
-      if (problemsCount === 0) {
-        const h3Elements = document.querySelectorAll('h3');
-        for (const h3 of h3Elements) {
-          const text = h3.textContent.trim();
-          const match = text.match(/Total\s+Problems\s+Solved:\s*(\d+)/i);
-          if (match && match[1]) {
-            problemsCount = parseInt(match[1], 10);
-            result.debug.push('Found via h3 element: ' + problemsCount);
-            break;
-          }
+    // Extract "Total Problems Solved: N" from the problems-solved section
+    let totalSolved = 0;
+    const totalSolvedMatch = html.match(/Total\s+Problems\s+Solved:\s*(\d+)/i);
+    if (totalSolvedMatch && totalSolvedMatch[1]) {
+      totalSolved = parseInt(totalSolvedMatch[1], 10);
+      console.log(`📊 Found via regex: ${totalSolved} problems`);
+    }
+    
+    // Fallback: scan h3 elements in .problems-solved section
+    if (totalSolved === 0) {
+      $('.problems-solved h3').each((_, el) => {
+        const text = $(el).text().trim();
+        const match = text.match(/Total\s+Problems\s+Solved:\s*(\d+)/i);
+        if (match && match[1]) {
+          totalSolved = parseInt(match[1], 10);
+          console.log(`📊 Found via cheerio h3: ${totalSolved} problems`);
         }
-      }
-
-      // Fallback Method 2: Look in .problems-solved section
-      if (problemsCount === 0) {
-        const problemsSection = document.querySelector('.problems-solved');
-        if (problemsSection) {
-          const h3 = problemsSection.querySelector('h3');
-          if (h3) {
-            const match = h3.textContent.match(/Total\s+Problems\s+Solved:\s*(\d+)/i);
-            if (match && match[1]) {
-              problemsCount = parseInt(match[1], 10);
-              result.debug.push('Found via .problems-solved h3: ' + problemsCount);
-            }
-          }
-        }
-      }
-
-      // Fallback Method 3: Look for section with specific text
-      if (problemsCount === 0) {
-        const sections = document.querySelectorAll('section');
-        for (const section of sections) {
-          const sectionText = section.textContent;
-          const match = sectionText.match(/Total\s+Problems\s+Solved:\s*(\d+)/i);
-          if (match && match[1]) {
-            problemsCount = parseInt(match[1], 10);
-            result.debug.push('Found via section scan: ' + problemsCount);
-            break;
-          }
-        }
-      }
-
-      result.totalSolved = problemsCount;
-
-      // Check if profile is private
-      if (result.username && result.totalSolved === 0) {
-        result.isPrivate = true;
-      }
-
-      return result;
-    });
-
-    // Close browser
-    await browser.close();
-    console.log(`✅ Stats extracted successfully`);
-    console.log(`🔍 Debug info:`, stats.debug);
-    console.log(`📊 Final count: ${stats.totalSolved} problems`);
-
-    // Return error if username not found in profile
-    if (!stats.username) {
-      return {
-        error: 'Account does not exist',
-        type: 'NOT_FOUND'
-      };
+      });
     }
 
-    // Handle private profiles gracefully
-    if (stats.isPrivate) {
-      console.log(`🔒 Profile is private`);
+    // Extract rating
+    let rating = 0;
+    const ratingEl = $('.rating-header .rating-number');
+    if (ratingEl.length) {
+      rating = parseInt(ratingEl.first().text().trim(), 10) || 0;
+    }
+
+    // Extract stars (count ★ symbols in .rating-star)
+    let stars = 0;
+    const starEl = $('.rating-star span');
+    if (starEl.length) {
+      stars = starEl.length;
+    }
+
+    // Extract global rank
+    let globalRank = null;
+    const rankEl = $('.global-rank');
+    if (rankEl.length) {
+      globalRank = parseInt(rankEl.first().text().trim(), 10) || null;
+    }
+
+    console.log(`✅ Stats: ${totalSolved} problems, rating ${rating}, ${stars} stars`);
+
+    // Handle profiles with zero solved problems (possibly private)
+    if (totalSolved === 0) {
       return {
         username: trimmedUsername,
         totalSolved: 0,
+        rating,
+        stars,
+        globalRank,
         isPrivate: true,
-        warning: 'CodeChef profile is private. Username saved, but stats cannot be fetched.'
+        warning: 'CodeChef profile is private or has zero problems solved.'
       };
     }
 
-    // Return successful stats
-    console.log(`📈 Stats: ${stats.totalSolved} problems`);
     return {
       username: trimmedUsername,
-      totalSolved: stats.totalSolved,
+      totalSolved,
+      rating,
+      stars,
+      globalRank,
       isPrivate: false
     };
 
   } catch (error) {
-    // Ensure browser is closed on error
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (closeError) {
-        console.error('Error closing browser:', closeError.message);
-      }
-    }
-
     // Handle timeout errors
-    if (error.name === 'TimeoutError') {
+    if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
       console.error('⏱️ Timeout error:', error.message);
       return {
         error: 'Unable to fetch CodeChef data right now. Please try later.',
@@ -215,17 +130,19 @@ const getCodeChefStats = async (username) => {
       };
     }
 
-    // Handle navigation errors
-    if (error.message && error.message.includes('net::ERR')) {
-      console.error('🌐 Network error:', error.message);
+    // Handle network / HTTP errors
+    if (error.response) {
+      if (error.response.status === 404) {
+        return { error: 'Account does not exist', type: 'NOT_FOUND' };
+      }
+      console.error(`🌐 HTTP ${error.response.status}:`, error.message);
       return {
         error: 'Unable to fetch CodeChef data right now. Please try later.',
         type: 'NETWORK_ERROR'
       };
     }
 
-    // Generic error
-    console.error('❌ CodeChef Puppeteer Error:', error.message);
+    console.error('❌ CodeChef fetch error:', error.message);
     return {
       error: 'Unable to fetch CodeChef data right now. Please try later.',
       type: 'UNKNOWN_ERROR'

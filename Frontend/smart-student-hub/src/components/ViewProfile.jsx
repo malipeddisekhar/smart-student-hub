@@ -150,6 +150,32 @@ const ViewProfile = ({ studentData }) => {
                 {profile.collegeEmail || "Not provided"}
               </p>
             </div>
+
+            <div className="bg-gradient-to-r from-blue-50 to-cyan-50 p-4 rounded-xl">
+              <h3 className="font-semibold text-gray-700 mb-2">
+                LinkedIn Profile
+              </h3>
+              {profile.linkedinProfile ? (
+                <a href={profile.linkedinProfile} target="_blank" rel="noopener noreferrer" className="text-blue-600 font-medium hover:underline break-all">
+                  {profile.linkedinProfile}
+                </a>
+              ) : (
+                <p className="text-gray-500 font-medium">Not provided</p>
+              )}
+            </div>
+
+            <div className="bg-gradient-to-r from-gray-50 to-slate-50 p-4 rounded-xl">
+              <h3 className="font-semibold text-gray-700 mb-2">
+                GitHub Profile
+              </h3>
+              {profile.githubProfile ? (
+                <a href={profile.githubProfile} target="_blank" rel="noopener noreferrer" className="text-gray-800 font-medium hover:underline break-all">
+                  {profile.githubProfile}
+                </a>
+              ) : (
+                <p className="text-gray-500 font-medium">Not provided</p>
+              )}
+            </div>
           </div>
 
  {/* Educational Certificates */}

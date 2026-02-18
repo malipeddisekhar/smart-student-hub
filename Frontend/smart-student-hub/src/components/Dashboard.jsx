@@ -558,6 +558,72 @@ const Dashboard = ({ studentData, onLogout }) => {
             </div>
           </div>
 
+          <div
+            className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden"
+            onClick={() => navigate("/resume-editor")}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="relative z-10">
+              <div className="w-16 h-16 bg-gradient-to-br from-teal-600 to-cyan-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <svg
+                  className="w-8 h-8 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-teal-700 transition-colors">
+                Resume & Portfolio Editor
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                Edit your resume & portfolio content in one place — changes reflect everywhere
+              </p>
+              <div className="mt-4 flex items-center text-teal-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
+                <span className="text-sm">Edit →</span>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden"
+            onClick={() => navigate("/resume-analyzer")}
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="relative z-10">
+              <div className="w-16 h-16 bg-gradient-to-br from-rose-600 to-pink-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <svg
+                  className="w-8 h-8 text-white"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                  />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-rose-700 transition-colors">
+                AI Resume Analyzer
+              </h3>
+              <p className="text-gray-600 leading-relaxed">
+                AI-powered resume analysis with real internship recommendations from top platforms
+              </p>
+              <div className="mt-4 flex items-center text-rose-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
+                <span className="text-sm">Analyze →</span>
+              </div>
+            </div>
+          </div>
+
           <LeetCodeCard studentData={studentData} />
           <CodeChefCard studentData={studentData} />
 

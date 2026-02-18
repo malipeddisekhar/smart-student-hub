@@ -180,6 +180,30 @@ const StudentProfile = ({ studentData }) => {
                       placeholder="Enter College Email"
                     />
                   </div>
+                  
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-700">LinkedIn Profile</label>
+                    <input
+                      type="url"
+                      name="linkedinProfile"
+                      value={formData.linkedinProfile}
+                      onChange={handleChange}
+                      className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
+                      placeholder="https://linkedin.com/in/yourprofile"
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-gray-700">GitHub Profile</label>
+                    <input
+                      type="url"
+                      name="githubProfile"
+                      value={formData.githubProfile}
+                      onChange={handleChange}
+                      className="w-full p-4 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
+                      placeholder="https://github.com/yourusername"
+                    />
+                  </div>
                 </div>
               </div>
 

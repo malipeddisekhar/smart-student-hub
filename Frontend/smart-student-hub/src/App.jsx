@@ -16,6 +16,8 @@ import Projects from "./components/Projects";
 import AcademicRecords from "./components/AcademicRecords";
 import AcademicCertificatesNew from "./components/AcademicCertificatesNew";
 import ProfessionalPortfolio from "./components/ProfessionalPortfolio";
+import ResumePortfolioEditor from "./components/ResumePortfolioEditor";
+import ResumeAnalyzer from "./components/ResumeAnalyzer";
 import TeacherLogin from "./components/TeacherLogin";
 import TeacherRegister from "./components/TeacherRegister";
 import TeacherDashboard from "./components/TeacherDashboard";
@@ -33,11 +35,21 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const savedStudentData = sessionStorage.getItem("studentData");
+    console.log('🚀 App.jsx mounting, checking for stored user...');
+    
+    // Check both sessionStorage and localStorage for user data
+    const savedStudentData = sessionStorage.getItem("studentData") || localStorage.getItem("user");
     const savedTeacherData = sessionStorage.getItem("teacherData");
     const savedAdminData = sessionStorage.getItem("adminData");
+    
+    console.log('Stored student data:', savedStudentData ? 'Found' : 'Not found');
+    console.log('Stored teacher data:', savedTeacherData ? 'Found' : 'Not found');
+    console.log('Stored admin data:', savedAdminData ? 'Found' : 'Not found');
+    
     if (savedStudentData) {
-      setStudentData(JSON.parse(savedStudentData));
+      const user = JSON.parse(savedStudentData);
+      console.log('✅ Loading student from storage:', user);
+      setStudentData(user);
     }
     if (savedTeacherData) {
       setTeacherData(JSON.parse(savedTeacherData));
@@ -49,8 +61,11 @@ function App() {
   }, []);
 
   const handleLogin = (data) => {
+    console.log('📢 handleLogin called with:', data);
     setStudentData(data);
     sessionStorage.setItem("studentData", JSON.stringify(data));
+    localStorage.setItem("user", JSON.stringify(data)); // Also save to localStorage for OAuth
+    console.log('💾 Student data saved to storage');
   };
 
   const handleTeacherLogin = (data) => {
@@ -61,6 +76,8 @@ function App() {
   const handleLogout = () => {
     setStudentData(null);
     sessionStorage.removeItem("studentData");
+    localStorage.removeItem("user");
+    localStorage.removeItem("authToken");
   };
 
   const handleTeacherLogout = () => {
@@ -79,7 +96,14 @@ function App() {
   };
 
   if (isLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -106,6 +130,10 @@ function App() {
               <StudentLogin onLogin={handleLogin} />
             )
           }
+        />
+        <Route
+          path="/student-login"
+          element={<StudentLogin onLogin={handleLogin} />}
         />
         <Route
           path="/register"
@@ -192,6 +220,26 @@ function App() {
           element={
             studentData ? (
               <ProfessionalPortfolio studentData={studentData} />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/resume-editor"
+          element={
+            studentData ? (
+              <ResumePortfolioEditor studentData={studentData} />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/resume-analyzer"
+          element={
+            studentData ? (
+              <ResumeAnalyzer studentData={studentData} />
             ) : (
               <Navigate to="/login" />
             )

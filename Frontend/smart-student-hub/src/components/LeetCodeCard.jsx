@@ -7,31 +7,68 @@ const LeetCodeCard = ({ studentData }) => {
   const [leetcodeUsername, setLeetcodeUsername] = useState("");
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [problemsSolved, setProblemsSolved] = useState(0);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  // Fetch current LeetCode data on component mount
-  useEffect(() => {
-    const fetchLeetCodeData = async () => {
-      if (studentData?.studentId) {
-        try {
-          const response = await api.get(
-            `/api/leetcode/${studentData.studentId}`
-          );
-          if (response.data.leetcodeUsername) {
-            setLeetcodeUsername(response.data.leetcodeUsername);
-            setProblemsSolved(response.data.problemsSolved || 0);
-          }
-        } catch (err) {
-          console.error("Error fetching LeetCode data:", err);
-        }
-      }
-    };
+  // Format time ago
+  const timeAgo = (date) => {
+    if (!date) return "";
+    const diff = Date.now() - new Date(date).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
 
+  // Fetch current LeetCode data on component mount
+  const fetchLeetCodeData = async () => {
+    if (studentData?.studentId) {
+      try {
+        const response = await api.get(
+          `/api/leetcode/${studentData.studentId}`
+        );
+        if (response.data.leetcodeUsername) {
+          setLeetcodeUsername(response.data.leetcodeUsername);
+          setProblemsSolved(response.data.problemsSolved || 0);
+          setLastUpdated(response.data.leetcodeUpdatedAt);
+        }
+      } catch (err) {
+        console.error("Error fetching LeetCode data:", err);
+      }
+    }
+  };
+
+  useEffect(() => {
     fetchLeetCodeData();
+    // Auto-refresh every 5 minutes
+    const interval = setInterval(fetchLeetCodeData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, [studentData]);
+
+  // Manual refresh button handler
+  const handleRefresh = async () => {
+    if (!leetcodeUsername || refreshing) return;
+    setRefreshing(true);
+    try {
+      const response = await api.post(
+        `/api/leetcode/refresh/${studentData.studentId}`
+      );
+      setProblemsSolved(response.data.problemsSolved);
+      setLastUpdated(response.data.leetcodeUpdatedAt);
+      setSuccess("Stats refreshed!");
+      setTimeout(() => setSuccess(""), 2000);
+    } catch (err) {
+      console.error("Refresh failed:", err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -121,6 +158,21 @@ const LeetCodeCard = ({ studentData }) => {
                   {problemsSolved}
                 </p>
               </div>
+            </div>
+            {/* Last updated + refresh */}
+            <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
+              <span>{lastUpdated ? `Updated ${timeAgo(lastUpdated)}` : ''}</span>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="flex items-center gap-1 text-orange-600 hover:text-orange-700 font-medium disabled:opacity-50"
+                title="Refresh stats now"
+              >
+                <svg className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {refreshing ? 'Refreshing...' : 'Refresh'}
+              </button>
             </div>
             <div className="flex gap-3">
               <a
