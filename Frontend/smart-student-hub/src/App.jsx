@@ -4,7 +4,9 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import LandingPage from "./components/LandingPage";
 import StudentLogin from "./components/StudentLogin";
 import StudentRegister from "./components/StudentRegister";
@@ -27,6 +29,225 @@ import AdminDashboard from "./components/AdminDashboard";
 import StudentDetails from "./components/StudentDetails";
 import Leaderboard from "./components/Leaderboard";
 import api from "./services/api";
+
+// Page transition wrapper
+const PageTransition = ({ children }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 12 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -12 }}
+    transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+  >
+    {children}
+  </motion.div>
+);
+
+// Animated routes component (needs useLocation inside Router)
+const AnimatedRoutes = ({ studentData, teacherData, adminData, handleLogin, handleTeacherLogin, handleLogout, handleTeacherLogout, handleAdminLogin, handleAdminLogout }) => {
+  const location = useLocation();
+  return (
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route
+          path="/"
+          element={studentData ? <Navigate to="/dashboard" /> : <PageTransition><LandingPage /></PageTransition>}
+        />
+        <Route
+          path="/student/:studentId"
+          element={<PageTransition><StudentDetails /></PageTransition>}
+        />
+        <Route
+          path="/leaderboard"
+          element={<PageTransition><Leaderboard studentData={studentData} /></PageTransition>}
+        />
+        <Route
+          path="/login"
+          element={
+            studentData ? (
+              <Navigate to="/dashboard" />
+            ) : (
+              <PageTransition><StudentLogin onLogin={handleLogin} /></PageTransition>
+            )
+          }
+        />
+        <Route
+          path="/student-login"
+          element={<PageTransition><StudentLogin onLogin={handleLogin} /></PageTransition>}
+        />
+        <Route
+          path="/register"
+          element={
+            studentData ? (
+              <Navigate to="/dashboard" />
+            ) : (
+              <PageTransition><StudentRegister onRegister={handleLogin} /></PageTransition>
+            )
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            studentData ? (
+              <PageTransition><Dashboard studentData={studentData} onLogout={handleLogout} /></PageTransition>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/personal-achievements"
+          element={
+            studentData ? (
+              <PageTransition><PersonalAchievements studentData={studentData} /></PageTransition>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            studentData ? (
+              <PageTransition><StudentProfile studentData={studentData} /></PageTransition>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/view-profile"
+          element={
+            studentData ? (
+              <PageTransition><ViewProfile studentData={studentData} /></PageTransition>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/projects"
+          element={
+            studentData ? (
+              <PageTransition><Projects studentData={studentData} /></PageTransition>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/academic-records"
+          element={
+            studentData ? (
+              <PageTransition><AcademicRecords studentData={studentData} /></PageTransition>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/academic-certificates"
+          element={
+            studentData ? (
+              <PageTransition><AcademicCertificatesNew studentData={studentData} /></PageTransition>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/professional-portfolio"
+          element={
+            studentData ? (
+              <PageTransition><ProfessionalPortfolio studentData={studentData} /></PageTransition>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/resume-editor"
+          element={
+            studentData ? (
+              <PageTransition><ResumePortfolioEditor studentData={studentData} /></PageTransition>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/resume-analyzer"
+          element={
+            studentData ? (
+              <PageTransition><ResumeAnalyzer studentData={studentData} /></PageTransition>
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
+        />
+        <Route
+          path="/teacher/login"
+          element={
+            teacherData ? (
+              <Navigate to="/teacher/dashboard" />
+            ) : (
+              <PageTransition><TeacherLogin onLogin={handleTeacherLogin} /></PageTransition>
+            )
+          }
+        />
+        <Route
+          path="/teacher/register"
+          element={
+            teacherData ? (
+              <Navigate to="/teacher/dashboard" />
+            ) : (
+              <PageTransition><TeacherRegister onRegister={handleTeacherLogin} /></PageTransition>
+            )
+          }
+        />
+        <Route
+          path="/teacher/dashboard"
+          element={
+            teacherData ? (
+              <PageTransition><TeacherDashboard teacherData={teacherData} onLogout={handleTeacherLogout} /></PageTransition>
+            ) : (
+              <Navigate to="/teacher/login" />
+            )
+          }
+        />
+        <Route
+          path="/admin/login"
+          element={
+            adminData ? (
+              <Navigate to="/admin/dashboard" />
+            ) : (
+              <PageTransition><AdminLogin onLogin={handleAdminLogin} /></PageTransition>
+            )
+          }
+        />
+        <Route
+          path="/admin/register"
+          element={
+            adminData ? (
+              <Navigate to="/admin/dashboard" />
+            ) : (
+              <PageTransition><AdminRegister onRegister={handleAdminLogin} /></PageTransition>
+            )
+          }
+        />
+        <Route
+          path="/admin/dashboard"
+          element={
+            adminData ? (
+              <PageTransition><AdminDashboard adminData={adminData} onLogout={handleAdminLogout} /></PageTransition>
+            ) : (
+              <Navigate to="/admin/login" />
+            )
+          }
+        />
+      </Routes>
+    </AnimatePresence>
+  );
+};
 
 function App() {
   const [studentData, setStudentData] = useState(null);
@@ -97,215 +318,37 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 animate-gradientShift">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          className="text-center"
+        >
+          <div className="relative w-20 h-20 mx-auto mb-6">
+            <div className="absolute inset-0 rounded-full border-4 border-indigo-100"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-indigo-600 animate-spin"></div>
+            <div className="absolute inset-2 rounded-full border-4 border-transparent border-t-purple-500 animate-spin" style={{ animationDirection: 'reverse', animationDuration: '0.8s' }}></div>
+          </div>
+          <p className="text-gray-500 font-medium tracking-wide">Loading...</p>
+        </motion.div>
       </div>
     );
   }
 
   return (
     <Router>
-      <Routes>
-        <Route
-          path="/"
-          element={studentData ? <Navigate to="/dashboard" /> : <LandingPage />}
-        />
-        <Route
-          path="/student/:studentId"
-          element={<StudentDetails />}
-        />
-        <Route
-          path="/leaderboard"
-          element={<Leaderboard studentData={studentData} />}
-        />
-        <Route
-          path="/login"
-          element={
-            studentData ? (
-              <Navigate to="/dashboard" />
-            ) : (
-              <StudentLogin onLogin={handleLogin} />
-            )
-          }
-        />
-        <Route
-          path="/student-login"
-          element={<StudentLogin onLogin={handleLogin} />}
-        />
-        <Route
-          path="/register"
-          element={
-            studentData ? (
-              <Navigate to="/dashboard" />
-            ) : (
-              <StudentRegister onRegister={handleLogin} />
-            )
-          }
-        />
-        <Route
-          path="/dashboard"
-          element={
-            studentData ? (
-              <Dashboard studentData={studentData} onLogout={handleLogout} />
-            ) : (
-              <Navigate to="/" />
-            )
-          }
-        />
-        <Route
-          path="/personal-achievements"
-          element={
-            studentData ? (
-              <PersonalAchievements studentData={studentData} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/profile"
-          element={
-            studentData ? (
-              <StudentProfile studentData={studentData} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/view-profile"
-          element={
-            studentData ? (
-              <ViewProfile studentData={studentData} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/projects"
-          element={
-            studentData ? (
-              <Projects studentData={studentData} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/academic-records"
-          element={
-            studentData ? (
-              <AcademicRecords studentData={studentData} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/academic-certificates"
-          element={
-            studentData ? (
-              <AcademicCertificatesNew studentData={studentData} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/professional-portfolio"
-          element={
-            studentData ? (
-              <ProfessionalPortfolio studentData={studentData} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/resume-editor"
-          element={
-            studentData ? (
-              <ResumePortfolioEditor studentData={studentData} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/resume-analyzer"
-          element={
-            studentData ? (
-              <ResumeAnalyzer studentData={studentData} />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
-          path="/teacher/login"
-          element={
-            teacherData ? (
-              <Navigate to="/teacher/dashboard" />
-            ) : (
-              <TeacherLogin onLogin={handleTeacherLogin} />
-            )
-          }
-        />
-        <Route
-          path="/teacher/register"
-          element={
-            teacherData ? (
-              <Navigate to="/teacher/dashboard" />
-            ) : (
-              <TeacherRegister onRegister={handleTeacherLogin} />
-            )
-          }
-        />
-        <Route
-          path="/teacher/dashboard"
-          element={
-            teacherData ? (
-              <TeacherDashboard teacherData={teacherData} onLogout={handleTeacherLogout} />
-            ) : (
-              <Navigate to="/teacher/login" />
-            )
-          }
-        />
-        <Route
-          path="/admin/login"
-          element={
-            adminData ? (
-              <Navigate to="/admin/dashboard" />
-            ) : (
-              <AdminLogin onLogin={handleAdminLogin} />
-            )
-          }
-        />
-        <Route
-          path="/admin/register"
-          element={
-            adminData ? (
-              <Navigate to="/admin/dashboard" />
-            ) : (
-              <AdminRegister onRegister={handleAdminLogin} />
-            )
-          }
-        />
-        <Route
-          path="/admin/dashboard"
-          element={
-            adminData ? (
-              <AdminDashboard adminData={adminData} onLogout={handleAdminLogout} />
-            ) : (
-              <Navigate to="/admin/login" />
-            )
-          }
-        />
-      </Routes>
+      <AnimatedRoutes
+        studentData={studentData}
+        teacherData={teacherData}
+        adminData={adminData}
+        handleLogin={handleLogin}
+        handleTeacherLogin={handleTeacherLogin}
+        handleLogout={handleLogout}
+        handleTeacherLogout={handleTeacherLogout}
+        handleAdminLogin={handleAdminLogin}
+        handleAdminLogout={handleAdminLogout}
+      />
     </Router>
   );
 }

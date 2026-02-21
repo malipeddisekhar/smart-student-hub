@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import api from "../services/api";
 import CertificateScannerModal from "./CertificateScannerModal";
 
@@ -49,11 +50,23 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [showMessageForm, setShowMessageForm] = useState(false);
   const [messageForm, setMessageForm] = useState({ subject: '', message: '' });
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackForm, setFeedbackForm] = useState({ subject: '', message: '' });
+  const [feedbackStudent, setFeedbackStudent] = useState(null);
   
   // Scanner modal state
   const [showScannerModal, setShowScannerModal] = useState(false);
   const [scanningCert, setScanningCert] = useState(null);
   const [scanResults, setScanResults] = useState({});
+
+  // Certificate review stats
+  const [certStats, setCertStats] = useState({ approved: 0, rejected: 0, total: 0 });
+
+  // Dark mode state
+  const [dark, setDark] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('teacher-dark-mode')) ?? true; } catch { return true; }
+  });
+  useEffect(() => { localStorage.setItem('teacher-dark-mode', JSON.stringify(dark)); }, [dark]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -120,6 +133,14 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
         // Fetch pending academic certificates
         const certsRes = await api.get('/api/review/academic-certificates');
         setPendingCertificates(certsRes.data);
+
+        // Fetch teacher's certificate review stats
+        try {
+          const statsRes = await api.get(`/api/teacher/certificate-stats/${teacherData.teacherId}`);
+          setCertStats(statsRes.data);
+        } catch (e) {
+          console.error('Error fetching cert stats:', e);
+        }
       } catch (error) {
         setBackendStatus("Backend connection failed");
       }
@@ -132,8 +153,8 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
-      <nav className="bg-gradient-to-r from-green-600 to-emerald-600 text-white p-4 shadow-lg">
+    <div className={`min-h-screen bg-gradient-to-br ${dark ? 'from-gray-950 via-slate-900 to-gray-900' : 'from-green-50 via-emerald-50 to-teal-50'}`}>
+      <nav className={`${dark ? 'bg-gradient-to-r from-slate-900 via-gray-900 to-slate-800 border-b border-white/10' : 'bg-gradient-to-r from-green-600 to-emerald-600'} text-white p-4 shadow-lg`}>
         <div className="flex justify-between items-center">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-green-100 bg-clip-text text-transparent">
             Teacher Dashboard
@@ -147,12 +168,19 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 🔔
               </button>
               {showNotification && (
-                <div className="absolute right-0 mt-2 w-64 bg-white/90 backdrop-blur-xl text-black rounded-xl shadow-2xl p-4 z-10 border border-white/20">
+                <div className={`absolute right-0 mt-2 w-64 backdrop-blur-xl text-black rounded-xl shadow-2xl p-4 z-10 border ${dark ? 'bg-gray-900/95 border-white/10 text-white' : 'bg-white/90 border-white/20'}`}>
                   <p className="text-sm font-medium">Backend Status:</p>
-                  <p className="text-sm text-gray-600">{backendStatus}</p>
+                  <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-600'}`}>{backendStatus}</p>
                 </div>
               )}
             </div>
+            <button
+              onClick={() => setDark(!dark)}
+              className="bg-white/20 backdrop-blur-sm hover:bg-white/30 px-3 py-2 rounded-lg transition-all duration-200"
+              title={dark ? 'Light mode' : 'Dark mode'}
+            >
+              {dark ? '☀️' : '🌙'}
+            </button>
             <button
               onClick={handleLogout}
               className="bg-white/20 backdrop-blur-sm hover:bg-white/30 px-4 py-2 rounded-lg transition-all duration-200"
@@ -164,7 +192,12 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
       </nav>
 
       <div className="container mx-auto p-6">
-        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8 mb-8 border border-white/20">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className={`backdrop-blur-xl rounded-2xl shadow-xl p-8 mb-8 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}
+        >
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-6">
               <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
@@ -174,7 +207,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 <h2 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-2">
                   Welcome, {teacherData?.name || "Teacher"}!
                 </h2>
-                <p className="text-gray-600 text-lg">
+                <p className={`text-lg ${dark ? "text-gray-400" : "text-gray-600"}`}>
                   Teacher ID: {teacherData?.teacherId}
                 </p>
               </div>
@@ -186,10 +219,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
               Edit Profile
             </button>
           </div>
-        </div>
+        </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-white/20">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className={`backdrop-blur-xl rounded-2xl shadow-xl p-6 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mb-4">
               <svg
                 className="w-6 h-6 text-white"
@@ -205,16 +238,16 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold mb-2 text-gray-800">
+            <h3 className={`text-lg font-semibold mb-2 ${dark ? "text-gray-200" : "text-gray-800"}`}>
               My Groups
             </h3>
-            <p className="text-gray-600">Assigned student groups</p>
+            <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>Assigned student groups</p>
             <p className="text-2xl font-bold text-green-600 mt-2">
               {groups.length}
             </p>
-          </div>
+          </motion.div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-white/20">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className={`backdrop-blur-xl rounded-2xl shadow-xl p-6 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
             <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center mb-4">
               <svg
                 className="w-6 h-6 text-white"
@@ -230,16 +263,16 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold mb-2 text-gray-800">
+            <h3 className={`text-lg font-semibold mb-2 ${dark ? "text-gray-200" : "text-gray-800"}`}>
               Total Students
             </h3>
-            <p className="text-gray-600">Students under supervision</p>
+            <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>Students under supervision</p>
             <p className="text-2xl font-bold text-green-600 mt-2">
               {students.length}
             </p>
-          </div>
+          </motion.div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-white/20">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} className={`backdrop-blur-xl rounded-2xl shadow-xl p-6 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
             <div className="w-12 h-12 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl flex items-center justify-center mb-4">
               <svg
                 className="w-6 h-6 text-white"
@@ -255,13 +288,13 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold mb-2 text-gray-800">
+            <h3 className={`text-lg font-semibold mb-2 ${dark ? "text-gray-200" : "text-gray-800"}`}>
               Reports
             </h3>
-            <p className="text-gray-600">Generate reports</p>
-          </div>
+            <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>Generate reports</p>
+          </motion.div>
 
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-6 border border-white/20">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }} className={`backdrop-blur-xl rounded-2xl shadow-xl p-6 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
             <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center mb-4">
               <svg
                 className="w-6 h-6 text-white"
@@ -283,15 +316,105 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold mb-2 text-gray-800">
+            <h3 className={`text-lg font-semibold mb-2 ${dark ? "text-gray-200" : "text-gray-800"}`}>
               Settings
             </h3>
-            <p className="text-gray-600">Manage preferences</p>
-          </div>
+            <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>Manage preferences</p>
+          </motion.div>
+
+          {/* Certificates Approved */}
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.5 }} className={`backdrop-blur-xl rounded-2xl shadow-xl p-6 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
+            <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-green-600 rounded-xl flex items-center justify-center mb-4">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className={`text-lg font-semibold mb-2 ${dark ? "text-gray-200" : "text-gray-800"}`}>Approved</h3>
+            <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>Certificates approved</p>
+            <p className="text-2xl font-bold text-emerald-600 mt-2">{certStats.approved}</p>
+          </motion.div>
+
+          {/* Certificates Rejected */}
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.6 }} className={`backdrop-blur-xl rounded-2xl shadow-xl p-6 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
+            <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-rose-600 rounded-xl flex items-center justify-center mb-4">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className={`text-lg font-semibold mb-2 ${dark ? "text-gray-200" : "text-gray-800"}`}>Rejected</h3>
+            <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>Certificates rejected</p>
+            <p className="text-2xl font-bold text-red-600 mt-2">{certStats.rejected}</p>
+          </motion.div>
         </div>
 
-        <div className="mt-8">
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-white/20">
+        {/* Review History */}
+        {certStats.recentReviews && certStats.recentReviews.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.7 }} className={`mt-6 backdrop-blur-xl rounded-2xl shadow-xl border overflow-hidden ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
+            <div className="p-6 pb-4 border-b border-gray-100">
+              <h3 className={`text-xl font-bold flex items-center gap-2 ${dark ? "text-gray-200" : "text-gray-800"}`}>
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                My Review History
+              </h3>
+              <p className={`text-sm mt-1 ${dark ? "text-gray-400" : "text-gray-500"}`}>Recent certificate reviews you've made</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead className={`${dark ? "bg-white/5" : "bg-gray-50/80"}`}>
+                  <tr>
+                    <th className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Student</th>
+                    <th className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Certificate</th>
+                    <th className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Status</th>
+                    <th className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Date</th>
+                    <th className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Feedback</th>
+                  </tr>
+                </thead>
+                <tbody className={`divide-y ${dark ? "divide-white/10" : "divide-gray-100"}`}>
+                  {certStats.recentReviews.map((review, idx) => (
+                    <tr key={idx} className={`transition-colors ${dark ? "hover:bg-white/5" : "hover:bg-green-50/50"}`}>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white text-sm font-bold">
+                            {review.studentName?.charAt(0) || '?'}
+                          </div>
+                          <div>
+                            <p className={`font-medium ${dark ? "text-gray-200" : "text-gray-800"}`}>{review.studentName}</p>
+                            <p className={`text-xs ${dark ? "text-gray-500" : "text-gray-400"}`}>{review.studentId}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className={`px-6 py-4 text-sm max-w-[200px] truncate ${dark ? "text-gray-300" : "text-gray-700"}`}>{review.certificateName}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          review.status === 'approved'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {review.status === 'approved' ? (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          ) : (
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                          )}
+                          {review.status === 'approved' ? 'Approved' : 'Rejected'}
+                        </span>
+                      </td>
+                      <td className={`px-6 py-4 text-sm whitespace-nowrap ${dark ? "text-gray-400" : "text-gray-500"}`}>
+                        {review.reviewedAt ? new Date(review.reviewedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                      </td>
+                      <td className={`px-6 py-4 text-sm max-w-[200px] truncate ${dark ? "text-gray-400" : "text-gray-500"}`} title={review.feedback || ''}>
+                        {review.feedback || <span className="text-gray-300 italic">No feedback</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        )}
+
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.8 }} className="mt-8">
+          <div className={`backdrop-blur-xl rounded-2xl shadow-xl p-8 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
             <div className="flex gap-4 mb-6 flex-wrap">
 
 
@@ -300,7 +423,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                   activeTab === "groups"
                     ? "bg-green-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    : dark ? "bg-white/10 text-gray-300 hover:bg-white/20" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
               >
                 My Groups
@@ -310,7 +433,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                   activeTab === "students"
                     ? "bg-green-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    : dark ? "bg-white/10 text-gray-300 hover:bg-white/20" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
               >
                 Student Management
@@ -320,7 +443,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                   activeTab === "marks"
                     ? "bg-green-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    : dark ? "bg-white/10 text-gray-300 hover:bg-white/20" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
               >
                 Student Marks
@@ -330,7 +453,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                   activeTab === "certificates"
                     ? "bg-green-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    : dark ? "bg-white/10 text-gray-300 hover:bg-white/20" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
               >
                 Certificate Review
@@ -340,7 +463,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                   activeTab === "profile"
                     ? "bg-green-600 text-white"
-                    : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                    : dark ? "bg-white/10 text-gray-300 hover:bg-white/20" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                 }`}
               >
                 Profile
@@ -353,18 +476,18 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
               <div>
                 <h3 className="text-xl font-bold mb-4">My Groups</h3>
                 {groups.length === 0 ? (
-                  <p className="text-gray-600">No groups assigned yet.</p>
+                  <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>No groups assigned yet.</p>
                 ) : (
                   <div className="space-y-4">
                     {groups.map((group) => (
                       <div
                         key={group._id}
-                        className="bg-gray-50 p-4 rounded-lg"
+                        className={`p-4 rounded-lg ${dark ? "bg-white/5" : "bg-gray-50"}`}
                       >
                         <div className="flex justify-between items-start">
                           <div>
                             <h4 className="font-semibold text-lg">{group.name}</h4>
-                            <p className="text-gray-600">
+                            <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>
                               Students: {group.students.length}
                             </p>
                           </div>
@@ -397,20 +520,20 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                       Student Management
                     </h3>
                     {students.length === 0 ? (
-                      <p className="text-gray-600">No students assigned yet.</p>
+                      <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>No students assigned yet.</p>
                     ) : (
                       <div className="grid gap-6">
                         {students.map((student) => (
                           <div
                             key={student.studentId}
-                            className="bg-gray-50 p-6 rounded-lg border"
+                            className={`p-6 rounded-lg border ${dark ? "bg-white/5 border-white/10" : "bg-gray-50 border-gray-200"}`}
                           >
                             <div className="flex justify-between items-start mb-4">
                               <div>
-                                <h4 className="text-lg font-semibold text-gray-800">
+                                <h4 className={`text-lg font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                                   {student.name}
                                 </h4>
-                                <p className="text-gray-600">
+                                <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>
                                   ID: {student.studentId}
                                 </p>
                               </div>
@@ -421,48 +544,48 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                               <div>
-                                <label className="block text-sm font-medium text-gray-700">
+                                <label className={`block text-sm font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   Email
                                 </label>
-                                <p className="text-gray-900">{student.email}</p>
+                                <p className={`${dark ? "text-gray-100" : "text-gray-900"}`}>{student.email}</p>
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700">
+                                <label className={`block text-sm font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   Department
                                 </label>
-                                <p className="text-gray-900">
+                                <p className={`${dark ? "text-gray-100" : "text-gray-900"}`}>
                                   {student.department}
                                 </p>
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700">
+                                <label className={`block text-sm font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   College
                                 </label>
-                                <p className="text-gray-900">
+                                <p className={`${dark ? "text-gray-100" : "text-gray-900"}`}>
                                   {student.college}
                                 </p>
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700">
+                                <label className={`block text-sm font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   Year
                                 </label>
-                                <p className="text-gray-900">
+                                <p className={`${dark ? "text-gray-100" : "text-gray-900"}`}>
                                   {student.year || "N/A"}
                                 </p>
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700">
+                                <label className={`block text-sm font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   Semester
                                 </label>
-                                <p className="text-gray-900">
+                                <p className={`${dark ? "text-gray-100" : "text-gray-900"}`}>
                                   {student.semester || "N/A"}
                                 </p>
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700">
+                                <label className={`block text-sm font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   Roll Number
                                 </label>
-                                <p className="text-gray-900">
+                                <p className={`${dark ? "text-gray-100" : "text-gray-900"}`}>
                                   {student.rollNumber || "N/A"}
                                 </p>
                               </div>
@@ -470,35 +593,35 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className={`block text-sm font-medium mb-2 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   Certificates
                                 </label>
-                                <p className="text-gray-900">
+                                <p className={`${dark ? "text-gray-100" : "text-gray-900"}`}>
                                   {student.personalCertificates?.length || 0}{" "}
                                   certificates
                                 </p>
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className={`block text-sm font-medium mb-2 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   Projects
                                 </label>
-                                <p className="text-gray-900">
+                                <p className={`${dark ? "text-gray-100" : "text-gray-900"}`}>
                                   {student.projects?.length || 0} projects
                                 </p>
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className={`block text-sm font-medium mb-2 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   CGPA
                                 </label>
-                                <p className="text-gray-900 font-semibold text-green-600">
+                                <p className={`font-semibold text-green-600 ${dark ? "text-green-400" : ""}`}>
                                   {student.cgpa || "N/A"}
                                 </p>
                               </div>
                               <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                <label className={`block text-sm font-medium mb-2 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   Semester Records
                                 </label>
-                                <p className="text-gray-900">
+                                <p className={`${dark ? "text-gray-100" : "text-gray-900"}`}>
                                   {student.semesterMarks?.length || 0} semesters
                                 </p>
                               </div>
@@ -541,6 +664,16 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                               >
                                 View Marks
                               </button>
+                              <button
+                                onClick={() => {
+                                  setFeedbackStudent(student);
+                                  setShowFeedbackForm(true);
+                                  setFeedbackForm({ subject: '', message: '' });
+                                }}
+                                className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white px-4 py-2 rounded hover:from-teal-700 hover:to-cyan-700 text-sm"
+                              >
+                                Send Feedback
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -581,7 +714,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                             {selectedStudent.name.charAt(0)}
                           </div>
                           <div>
-                            <h4 className="text-2xl font-bold text-gray-800">
+                            <h4 className={`text-2xl font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               {selectedStudent.name}
                             </h4>
                             <p className="text-green-600 font-medium">
@@ -590,7 +723,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                           </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                          <div className={`p-4 rounded-xl shadow-sm border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}>
                             <div className="flex items-center mb-2">
                               <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
                                 <svg
@@ -606,15 +739,15 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   />
                                 </svg>
                               </div>
-                              <span className="text-sm font-medium text-gray-500">
+                              <span className={`text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"}`}>
                                 Student ID
                               </span>
                             </div>
-                            <p className="text-lg font-semibold text-gray-800">
+                            <p className={`text-lg font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               {selectedStudent.studentId}
                             </p>
                           </div>
-                          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                          <div className={`p-4 rounded-xl shadow-sm border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}>
                             <div className="flex items-center mb-2">
                               <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mr-3">
                                 <svg
@@ -626,15 +759,15 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   <path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z" />
                                 </svg>
                               </div>
-                              <span className="text-sm font-medium text-gray-500">
+                              <span className={`text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"}`}>
                                 Email
                               </span>
                             </div>
-                            <p className="text-lg font-semibold text-gray-800">
+                            <p className={`text-lg font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               {selectedStudent.email}
                             </p>
                           </div>
-                          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                          <div className={`p-4 rounded-xl shadow-sm border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}>
                             <div className="flex items-center mb-2">
                               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center mr-3">
                                 <svg
@@ -649,15 +782,15 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   />
                                 </svg>
                               </div>
-                              <span className="text-sm font-medium text-gray-500">
+                              <span className={`text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"}`}>
                                 Department
                               </span>
                             </div>
-                            <p className="text-lg font-semibold text-gray-800">
+                            <p className={`text-lg font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               {selectedStudent.department}
                             </p>
                           </div>
-                          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                          <div className={`p-4 rounded-xl shadow-sm border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}>
                             <div className="flex items-center mb-2">
                               <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center mr-3">
                                 <svg
@@ -672,15 +805,15 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   />
                                 </svg>
                               </div>
-                              <span className="text-sm font-medium text-gray-500">
+                              <span className={`text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"}`}>
                                 College
                               </span>
                             </div>
-                            <p className="text-lg font-semibold text-gray-800">
+                            <p className={`text-lg font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               {selectedStudent.college}
                             </p>
                           </div>
-                          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                          <div className={`p-4 rounded-xl shadow-sm border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}>
                             <div className="flex items-center mb-2">
                               <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mr-3">
                                 <svg
@@ -695,16 +828,16 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   />
                                 </svg>
                               </div>
-                              <span className="text-sm font-medium text-gray-500">
+                              <span className={`text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"}`}>
                                 Year & Semester
                               </span>
                             </div>
-                            <p className="text-lg font-semibold text-gray-800">
+                            <p className={`text-lg font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               Year {selectedStudent.year || "N/A"}, Sem{" "}
                               {selectedStudent.semester || "N/A"}
                             </p>
                           </div>
-                          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                          <div className={`p-4 rounded-xl shadow-sm border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}>
                             <div className="flex items-center mb-2">
                               <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center mr-3">
                                 <svg
@@ -715,15 +848,15 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                               </div>
-                              <span className="text-sm font-medium text-gray-500">
+                              <span className={`text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"}`}>
                                 Roll Number
                               </span>
                             </div>
-                            <p className="text-lg font-semibold text-gray-800">
+                            <p className={`text-lg font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               {selectedStudent.rollNumber || "N/A"}
                             </p>
                           </div>
-                          <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                          <div className={`p-4 rounded-xl shadow-sm border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}>
                             <div className="flex items-center mb-2">
                               <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center mr-3">
                                 <svg
@@ -734,24 +867,24 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
                                 </svg>
                               </div>
-                              <span className="text-sm font-medium text-gray-500">
+                              <span className={`text-sm font-medium ${dark ? "text-gray-400" : "text-gray-500"}`}>
                                 Verified Skills
                               </span>
                             </div>
-                            <p className="text-lg font-semibold text-gray-800">
+                            <p className={`text-lg font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               {selectedStudent.skills ? Object.keys(selectedStudent.skills).length : 0} Skills
                             </p>
                           </div>
                         </div>
                         
                         <div className="mt-8">
-                          <h5 className="text-xl font-bold text-gray-800 mb-4">Verified Skills</h5>
+                          <h5 className={`text-xl font-bold mb-4 ${dark ? "text-gray-200" : "text-gray-800"}`}>Verified Skills</h5>
                           {selectedStudent.skills && Object.keys(selectedStudent.skills).length > 0 ? (
                             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                               {Object.entries(selectedStudent.skills).map(([skill, count]) => (
-                                <div key={skill} className="bg-white p-3 rounded-xl shadow-sm border border-gray-100">
+                                <div key={skill} className={`p-3 rounded-xl shadow-sm border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}>
                                   <div className="flex items-center justify-between">
-                                    <span className="text-gray-800 font-medium text-sm">{skill}</span>
+                                    <span className={`font-medium text-sm ${dark ? "text-gray-200" : "text-gray-800"}`}>{skill}</span>
                                     <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-bold">
                                       {count}
                                     </span>
@@ -766,7 +899,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
                                 </svg>
                               </div>
-                              <p className="text-sm font-medium text-gray-600">No verified skills yet</p>
+                              <p className={`text-sm font-medium ${dark ? "text-gray-400" : "text-gray-600"}`}>No verified skills yet</p>
                             </div>
                           )}
                         </div>
@@ -790,7 +923,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                             </svg>
                           </div>
                           <div>
-                            <h4 className="text-2xl font-bold text-gray-800">
+                            <h4 className={`text-2xl font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               {selectedStudent.name}'s Certificates
                             </h4>
                             <p className="text-blue-600 font-medium">
@@ -806,7 +939,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                               (cert, index) => (
                                 <div
                                   key={index}
-                                  className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
+                                  className={`p-6 rounded-2xl shadow-lg border hover:shadow-xl transition-all duration-300 ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}
                                 >
                                   <div className="flex gap-6">
                                     {cert.image && cert.image !== "" && (() => {
@@ -863,7 +996,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                         );
                                     })()}
                                     <div className="flex-1">
-                                      <h5 className="text-xl font-bold text-gray-800 mb-3">
+                                      <h5 className={`text-xl font-bold mb-3 ${dark ? "text-gray-200" : "text-gray-800"}`}>
                                         {cert.name}
                                       </h5>
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -882,10 +1015,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                             </svg>
                                           </div>
                                           <div>
-                                            <p className="text-sm text-gray-500">
+                                            <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-500"}`}>
                                               Issuer
                                             </p>
-                                            <p className="font-semibold text-gray-800">
+                                            <p className={`font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                                               {cert.issuer}
                                             </p>
                                           </div>
@@ -905,10 +1038,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                             </svg>
                                           </div>
                                           <div>
-                                            <p className="text-sm text-gray-500">
+                                            <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-500"}`}>
                                               Date
                                             </p>
-                                            <p className="font-semibold text-gray-800">
+                                            <p className={`font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                                               {cert.date}
                                             </p>
                                           </div>
@@ -928,7 +1061,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                             </svg>
                                           </div>
                                           <div>
-                                            <p className="text-sm text-gray-500">
+                                            <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-500"}`}>
                                               Category
                                             </p>
                                             <span className="inline-block bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-sm font-medium">
@@ -958,10 +1091,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                 />
                               </svg>
                             </div>
-                            <p className="text-xl font-semibold text-gray-600 mb-2">
+                            <p className={`text-xl font-semibold mb-2 ${dark ? "text-gray-400" : "text-gray-600"}`}>
                               No certificates found
                             </p>
-                            <p className="text-gray-500">
+                            <p className={`${dark ? "text-gray-400" : "text-gray-500"}`}>
                               This student hasn't uploaded any certificates yet.
                             </p>
                           </div>
@@ -986,7 +1119,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                             </svg>
                           </div>
                           <div>
-                            <h4 className="text-2xl font-bold text-gray-800">
+                            <h4 className={`text-2xl font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               {selectedStudent.name}'s Projects
                             </h4>
                             <p className="text-purple-600 font-medium">
@@ -1000,14 +1133,14 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                             {selectedStudent.projects.map((project, index) => (
                               <div
                                 key={index}
-                                className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-all duration-300"
+                                className={`p-6 rounded-2xl shadow-lg border hover:shadow-xl transition-all duration-300 ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}
                               >
                                 <div className="flex justify-between items-start mb-4">
                                   <div className="flex-1">
-                                    <h5 className="text-xl font-bold text-gray-800 mb-2">
+                                    <h5 className={`text-xl font-bold mb-2 ${dark ? "text-gray-200" : "text-gray-800"}`}>
                                       {project.title}
                                     </h5>
-                                    <p className="text-gray-600 leading-relaxed">
+                                    <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
                                       {project.description}
                                     </p>
                                   </div>
@@ -1082,10 +1215,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                 />
                               </svg>
                             </div>
-                            <p className="text-xl font-semibold text-gray-600 mb-2">
+                            <p className={`text-xl font-semibold mb-2 ${dark ? "text-gray-400" : "text-gray-600"}`}>
                               No projects found
                             </p>
-                            <p className="text-gray-500">
+                            <p className={`${dark ? "text-gray-400" : "text-gray-500"}`}>
                               This student hasn't added any projects yet.
                             </p>
                           </div>
@@ -1106,7 +1239,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                             </svg>
                           </div>
                           <div>
-                            <h4 className="text-2xl font-bold text-gray-800">
+                            <h4 className={`text-2xl font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                               {selectedStudent.name}'s Academic Records
                             </h4>
                             <p className="text-orange-600 font-medium">
@@ -1120,10 +1253,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                               (record, index) => (
                                 <div
                                   key={index}
-                                  className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100"
+                                  className={`p-6 rounded-2xl shadow-lg border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-100"}`}
                                 >
                                   <div className="flex justify-between items-center mb-4">
-                                    <h5 className="text-xl font-bold text-gray-800">
+                                    <h5 className={`text-xl font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                                       Sem {record.semester} - Year {record.year}
                                     </h5>
                                     <span className="bg-orange-100 text-orange-800 px-4 py-2 rounded-full text-lg font-bold">
@@ -1132,7 +1265,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   </div>
                                   {record.subjects?.length > 0 && (
                                     <div className="grid gap-3">
-                                      <h6 className="font-semibold text-gray-700 mb-2">
+                                      <h6 className={`font-semibold mb-2 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                         Subject Details:
                                       </h6>
                                       {record.subjects.map(
@@ -1141,11 +1274,11 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                             key={subIndex}
                                             className="flex justify-between items-center bg-gray-50 p-3 rounded-lg"
                                           >
-                                            <span className="font-medium text-gray-800">
+                                            <span className={`font-medium ${dark ? "text-gray-200" : "text-gray-800"}`}>
                                               {subject.name}
                                             </span>
                                             <div className="flex gap-4">
-                                              <span className="text-gray-600">
+                                              <span className={`${dark ? "text-gray-400" : "text-gray-600"}`}>
                                                 Marks: {subject.marks}
                                               </span>
                                               <span className="font-semibold text-blue-600">
@@ -1172,10 +1305,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                 <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                             </div>
-                            <p className="text-xl font-semibold text-gray-600 mb-2">
+                            <p className={`text-xl font-semibold mb-2 ${dark ? "text-gray-400" : "text-gray-600"}`}>
                               No academic records found
                             </p>
-                            <p className="text-gray-500">
+                            <p className={`${dark ? "text-gray-400" : "text-gray-500"}`}>
                               This student's semester marks haven't been added
                               yet.
                             </p>
@@ -1217,9 +1350,9 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                     </div>
 
                     {students.length === 0 ? (
-                      <p className="text-gray-600">No students assigned yet.</p>
+                      <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>No students assigned yet.</p>
                     ) : (
-                      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                      <div className={`rounded-xl shadow-lg overflow-hidden ${dark ? "bg-white/5" : "bg-white"}`}>
                         <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-6">
                           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                             <h4 className="text-xl font-bold">Student List</h4>
@@ -1244,12 +1377,12 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                 placeholder="Search students..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 pr-4 py-3 w-80 rounded-xl border-0 bg-white/90 backdrop-blur-sm text-gray-800 placeholder-gray-500 focus:ring-2 focus:ring-white/50 focus:bg-white transition-all duration-200 shadow-lg"
+                                className={`pl-10 pr-4 py-3 w-80 rounded-xl border-0 backdrop-blur-sm placeholder-gray-500 focus:ring-2 focus:ring-white/50 transition-all duration-200 shadow-lg ${dark ? "bg-white/10 text-white focus:bg-white/15" : "bg-white/90 text-gray-800 focus:bg-white"}`}
                               />
                             </div>
                           </div>
                         </div>
-                        <div className="divide-y divide-gray-200">
+                        <div className={`divide-y ${dark ? "divide-white/10" : "divide-gray-200"}`}>
                           {students
                             .filter(
                               (student) =>
@@ -1275,10 +1408,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                       {student.name.charAt(0)}
                                     </div>
                                     <div>
-                                      <h5 className="font-semibold text-gray-800">
+                                      <h5 className={`font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                                         {student.name}
                                       </h5>
-                                      <p className="text-sm text-gray-600">
+                                      <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-600"}`}>
                                         Roll: {student.rollNumber || "N/A"} |
                                         ID: {student.studentId}
                                       </p>
@@ -1286,13 +1419,13 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                                   </div>
                                   <div className="flex items-center space-x-4">
                                     <div className="text-right">
-                                      <p className="text-sm text-gray-600">
+                                      <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-600"}`}>
                                         CGPA:{" "}
                                         <span className="font-semibold text-green-600">
                                           {student.cgpa || "N/A"}
                                         </span>
                                       </p>
-                                      <p className="text-sm text-gray-600">
+                                      <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-600"}`}>
                                         Semesters:{" "}
                                         {student.semesterMarks?.length || 0}
                                       </p>
@@ -1330,7 +1463,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                       <h3 className="text-xl font-bold">Edit Student Marks</h3>
                     </div>
 
-                    <div className="bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
+                    <div className={`p-8 rounded-2xl shadow-xl border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-200"}`}>
                       <div className="flex items-center mb-8">
                         <div className="w-16 h-16 bg-blue-500 rounded-2xl flex items-center justify-center mr-4">
                           <svg
@@ -1342,7 +1475,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                           </svg>
                         </div>
                         <div>
-                          <h4 className="text-2xl font-bold text-gray-900">
+                          <h4 className={`text-2xl font-bold ${dark ? "text-gray-100" : "text-gray-900"}`}>
                             Edit {selectedStudent?.name}'s Marks
                           </h4>
                           <p className="text-blue-600 font-medium text-lg">
@@ -1356,17 +1489,17 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                             (record, index) => (
                               <div
                                 key={index}
-                                className="bg-gray-50 p-6 rounded-2xl border border-gray-200"
+                                className={`p-6 rounded-2xl border ${dark ? "bg-white/5 border-white/10" : "bg-gray-50 border-gray-200"}`}
                               >
                                 <div className="flex justify-between items-center">
                                   <div className="flex items-center space-x-4">
                                     <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                                      <span className="text-xl font-bold text-gray-700">
+                                      <span className={`text-xl font-bold ${dark ? "text-gray-200" : "text-gray-700"}`}>
                                         {record.semester}
                                       </span>
                                     </div>
                                     <div>
-                                      <h5 className="text-xl font-bold text-gray-900">
+                                      <h5 className={`text-xl font-bold ${dark ? "text-gray-100" : "text-gray-900"}`}>
                                         Semester {record.semester} - Year{" "}
                                         {record.year}
                                       </h5>
@@ -1396,10 +1529,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                         </div>
                       ) : (
                         <div className="text-center py-12">
-                          <p className="text-xl font-semibold text-gray-600 mb-2">
+                          <p className={`text-xl font-semibold mb-2 ${dark ? "text-gray-400" : "text-gray-600"}`}>
                             No marks found
                           </p>
-                          <p className="text-gray-500">
+                          <p className={`${dark ? "text-gray-400" : "text-gray-500"}`}>
                             This student doesn't have any semester marks yet.
                           </p>
                         </div>
@@ -1426,17 +1559,17 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                         <path d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 713.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 713.138-3.138z"/>
                       </svg>
                     </div>
-                    <h3 className="text-lg font-semibold text-gray-600 mb-2">No pending certificates</h3>
-                    <p className="text-gray-500">All academic certificates have been reviewed.</p>
+                    <h3 className={`text-lg font-semibold mb-2 ${dark ? "text-gray-400" : "text-gray-600"}`}>No pending certificates</h3>
+                    <p className={`${dark ? "text-gray-400" : "text-gray-500"}`}>All academic certificates have been reviewed.</p>
                   </div>
                 ) : (
                   <div className="grid gap-4">
                     {pendingCertificates.map((cert) => (
-                      <div key={cert.certificateId} className="bg-white rounded-xl p-4 border border-gray-200 shadow-md hover:shadow-lg transition-all duration-200">
+                      <div key={cert.certificateId} className={`rounded-xl p-4 border shadow-md hover:shadow-lg transition-all duration-200 ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-200"}`}>
                         <div className="flex justify-between items-start mb-3">
                           <div>
-                            <h4 className="text-lg font-bold text-gray-800">{cert.certificateName}</h4>
-                            <p className="text-sm text-gray-600">{cert.studentName} ({cert.studentId})</p>
+                            <h4 className={`text-lg font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}>{cert.certificateName}</h4>
+                            <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-600"}`}>{cert.studentName} ({cert.studentId})</p>
                             <span className="inline-block bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-medium capitalize">
                               {cert.domain}
                             </span>
@@ -1448,26 +1581,26 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                         
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-xs">
                           <div>
-                            <span className="text-gray-500">Issued By:</span>
-                            <p className="font-medium text-gray-800">{cert.issuedBy}</p>
+                            <span className={`${dark ? "text-gray-400" : "text-gray-500"}`}>Issued By:</span>
+                            <p className={`font-medium ${dark ? "text-gray-200" : "text-gray-800"}`}>{cert.issuedBy}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500">Date:</span>
-                            <p className="font-medium text-gray-800">{new Date(cert.date).toLocaleDateString()}</p>
+                            <span className={`${dark ? "text-gray-400" : "text-gray-500"}`}>Date:</span>
+                            <p className={`font-medium ${dark ? "text-gray-200" : "text-gray-800"}`}>{new Date(cert.date).toLocaleDateString()}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500">Duration:</span>
-                            <p className="font-medium text-gray-800">{cert.duration || 'N/A'}</p>
+                            <span className={`${dark ? "text-gray-400" : "text-gray-500"}`}>Duration:</span>
+                            <p className={`font-medium ${dark ? "text-gray-200" : "text-gray-800"}`}>{cert.duration || 'N/A'}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500">Location:</span>
-                            <p className="font-medium text-gray-800">{cert.location || 'N/A'}</p>
+                            <span className={`${dark ? "text-gray-400" : "text-gray-500"}`}>Location:</span>
+                            <p className={`font-medium ${dark ? "text-gray-200" : "text-gray-800"}`}>{cert.location || 'N/A'}</p>
                           </div>
                         </div>
                         
                         {cert.skills && cert.skills.length > 0 && (
                           <div className="mb-3">
-                            <span className="text-xs text-gray-500">Skills:</span>
+                            <span className={`text-xs ${dark ? "text-gray-500" : "text-gray-500"}`}>Skills:</span>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {cert.skills.map((skill, index) => (
                                 <span key={index} className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs">
@@ -1480,8 +1613,8 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                         
                         {cert.description && (
                           <div className="mb-3">
-                            <span className="text-xs text-gray-500">Description:</span>
-                            <p className="text-sm text-gray-800 mt-1">{cert.description}</p>
+                            <span className={`text-xs ${dark ? "text-gray-500" : "text-gray-500"}`}>Description:</span>
+                            <p className={`text-sm mt-1 ${dark ? "text-gray-200" : "text-gray-800"}`}>{cert.description}</p>
                           </div>
                         )}
                         
@@ -1556,7 +1689,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                               )}
                             </div>
                             {cert.verificationDetails?.verificationNotes && (
-                              <p className="text-xs text-gray-600 mt-2">
+                              <p className={`text-xs mt-2 ${dark ? "text-gray-400" : "text-gray-600"}`}>
                                 {cert.verificationDetails.verificationNotes}
                               </p>
                             )}
@@ -1612,22 +1745,22 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
             {activeTab === "profile" && (
               <div>
                 <h3 className="text-xl font-bold mb-4">Teacher Profile</h3>
-                <div className="bg-white p-6 rounded-lg border">
+                <div className={`p-6 rounded-lg border ${dark ? "bg-white/5 border-white/10" : "bg-white border-gray-200"}`}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                      <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Name</label>
                       <input type="text" defaultValue={teacherData?.name} className="w-full p-3 border rounded-lg" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Teacher ID</label>
+                      <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Teacher ID</label>
                       <input type="text" defaultValue={teacherData?.teacherId} className="w-full p-3 border rounded-lg" disabled />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Email</label>
                       <input type="email" defaultValue={teacherData?.email} className="w-full p-3 border rounded-lg" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                      <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Department</label>
                       <input type="text" defaultValue={teacherData?.department} className="w-full p-3 border rounded-lg" />
                     </div>
                   </div>
@@ -1638,7 +1771,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {showImagePopup && selectedImage && (
@@ -1647,7 +1780,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
           onClick={() => setShowImagePopup(false)}
         >
           <div
-            className="bg-white/90 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl max-w-6xl w-full mx-4 p-8 animate-slideUp"
+            className={`backdrop-blur-xl border shadow-2xl rounded-2xl max-w-6xl w-full mx-4 p-8 animate-slideUp ${dark ? "bg-gray-900/95 border-white/10" : "bg-white/90 border-white/20"}`}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -1656,7 +1789,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
               </h2>
               <button
                 onClick={() => setShowImagePopup(false)}
-                className="text-gray-400 hover:text-gray-600 text-3xl transition-colors duration-200 hover:rotate-90 transform transition-transform"
+                className={`text-3xl transition-colors duration-200 hover:rotate-90 transform transition-transform ${dark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
               >
                 ×
               </button>
@@ -1696,7 +1829,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
 
       {showBulkMarks && (
         <div className="fixed inset-0 backdrop-blur-lg bg-gradient-to-br from-green-100/30 via-emerald-100/20 to-teal-100/30 flex items-center justify-center z-50 overflow-y-auto">
-          <div className="bg-white/95 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl max-w-6xl w-full mx-4 my-8 p-8">
+          <div className={`backdrop-blur-xl border shadow-2xl rounded-2xl max-w-6xl w-full mx-4 my-8 p-8 ${dark ? "bg-gray-900/95 border-white/10" : "bg-white/95 border-white/20"}`}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
                 Bulk Marks Entry - Semester {bulkMarksData.semester} Year{" "}
@@ -1704,7 +1837,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
               </h2>
               <button
                 onClick={() => setShowBulkMarks(false)}
-                className="text-gray-400 hover:text-gray-600 text-2xl"
+                className={`text-2xl ${dark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
               >
                 ×
               </button>
@@ -1744,7 +1877,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
               {bulkMarksData.students.map((student, studentIndex) => (
                 <div
                   key={student.studentId}
-                  className="border-b border-gray-200 p-4 bg-white hover:bg-gray-50"
+                  className={`border-b p-4 ${dark ? "border-white/10 bg-white/5 hover:bg-white/10" : "border-gray-200 bg-white hover:bg-gray-50"}`}
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
@@ -1752,10 +1885,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                         {student.name.charAt(0)}
                       </div>
                       <div>
-                        <h4 className="font-semibold text-gray-800">
+                        <h4 className={`font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                           {student.name}
                         </h4>
-                        <p className="text-sm text-gray-600">
+                        <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-600"}`}>
                           Roll: {student.rollNumber}
                         </p>
                       </div>
@@ -1850,12 +1983,12 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
 
       {editingMark !== null && (
         <div className="fixed inset-0 backdrop-blur-lg bg-gradient-to-br from-blue-100/30 via-purple-100/20 to-pink-100/30 flex items-center justify-center z-50">
-          <div className="bg-white/95 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl max-w-md w-full mx-4 p-6">
+          <div className={`backdrop-blur-xl border shadow-2xl rounded-2xl max-w-md w-full mx-4 p-6 ${dark ? "bg-gray-900/95 border-white/10" : "bg-white/95 border-white/20"}`}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-800">Edit SGPA</h3>
+              <h3 className={`text-xl font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}>Edit SGPA</h3>
               <button
                 onClick={() => setEditingMark(null)}
-                className="text-gray-400 hover:text-gray-600 text-xl"
+                className={`text-xl ${dark ? "text-gray-500 hover:text-gray-300" : "text-gray-400 hover:text-gray-600"}`}
               >
                 ×
               </button>
@@ -1863,7 +1996,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                   Semester
                 </label>
                 <input
@@ -1877,7 +2010,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                   Year
                 </label>
                 <input
@@ -1891,7 +2024,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                   SGPA
                 </label>
                 <input
@@ -1945,17 +2078,17 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
       
       {reviewingCert && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-lg w-full">
+          <div className={`backdrop-blur-xl rounded-2xl shadow-2xl max-w-lg w-full ${dark ? "bg-gray-900/95" : "bg-white/95"}`}>
             <div className="p-6 border-b border-gray-200/50">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-800">
+                <h3 className={`text-xl font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                   {reviewForm.status === 'approved' ? 'Approve' : 'Reject'} Certificate
                 </h3>
                 <button
                   onClick={() => setReviewingCert(null)}
                   className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center"
                 >
-                  <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className={`w-4 h-4 ${dark ? "text-gray-400" : "text-gray-600"}`} fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
                   </svg>
                 </button>
@@ -1964,18 +2097,18 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
             
             <div className="p-6">
               <div className="mb-4">
-                <h4 className="font-semibold text-gray-800 mb-2">{reviewingCert.certificateName}</h4>
-                <p className="text-sm text-gray-600">Student: {reviewingCert.studentName}</p>
+                <h4 className={`font-semibold mb-2 ${dark ? "text-gray-200" : "text-gray-800"}`}>{reviewingCert.certificateName}</h4>
+                <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-600"}`}>Student: {reviewingCert.studentName}</p>
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                <label className={`block text-sm font-semibold mb-2 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                   {reviewForm.status === 'approved' ? 'Approval Comments (Optional)' : 'Rejection Reason'}
                 </label>
                 <textarea
                   value={reviewForm.feedback}
                   onChange={(e) => setReviewForm({...reviewForm, feedback: e.target.value})}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent ${dark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-200"}`}
                   rows="3"
                   placeholder={reviewForm.status === 'approved' ? 'Add any comments...' : 'Please provide reason for rejection...'}
                   required={reviewForm.status === 'rejected'}
@@ -1996,14 +2129,18 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                         ? `/api/review/academic-certificates/${reviewingCert.studentId}/${reviewingCert.certificateId}/approve-with-scan`
                         : `/api/review/academic-certificates/${reviewingCert.studentId}/${reviewingCert.certificateId}/reject-with-scan`;
                       
-                      const response = await api.post(path, { feedback: reviewForm.feedback });
+                      const response = await api.post(path, { feedback: reviewForm.feedback, teacherId: teacherData.teacherId, teacherName: teacherData.name });
                       
                       alert(`Certificate ${reviewForm.status} successfully!`);
                       setReviewingCert(null);
                       
-                      // Refresh pending certificates
+                      // Refresh pending certificates and stats
                       const certsRes = await api.get('/api/review/academic-certificates');
                       setPendingCertificates(certsRes.data);
+                      try {
+                        const statsRes = await api.get(`/api/teacher/certificate-stats/${teacherData.teacherId}`);
+                        setCertStats(statsRes.data);
+                      } catch (e) { /* ignore */ }
                     } catch (error) {
                       const errorMsg = error.response?.data?.error || error.message;
                       if (error.response?.data?.requiresScan) {
@@ -2038,10 +2175,10 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
       
       {showMessageForm && selectedGroup && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl max-w-lg w-full">
+          <div className={`backdrop-blur-xl rounded-2xl shadow-2xl max-w-lg w-full ${dark ? "bg-gray-900/95" : "bg-white/95"}`}>
             <div className="p-6 border-b border-gray-200/50">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-800">
+                <h3 className={`text-xl font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}>
                   Send Message to {selectedGroup.name}
                 </h3>
                 <button
@@ -2051,12 +2188,12 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                   }}
                   className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center"
                 >
-                  <svg className="w-4 h-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className={`w-4 h-4 ${dark ? "text-gray-400" : "text-gray-600"}`} fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
                   </svg>
                 </button>
               </div>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className={`text-sm mt-2 ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 This message will be sent to all {selectedGroup.students.length} students in the group
               </p>
             </div>
@@ -2064,27 +2201,27 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
             <div className="p-6">
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                     Subject
                   </label>
                   <input
                     type="text"
                     value={messageForm.subject}
                     onChange={(e) => setMessageForm({...messageForm, subject: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent ${dark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-200"}`}
                     placeholder="Enter message subject..."
                     required
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? "text-gray-300" : "text-gray-700"}`}>
                     Message
                   </label>
                   <textarea
                     value={messageForm.message}
                     onChange={(e) => setMessageForm({...messageForm, message: e.target.value})}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent ${dark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-200"}`}
                     rows="4"
                     placeholder="Type your message here..."
                     required
@@ -2136,6 +2273,110 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
         </div>
       )}
       
+      {/* Individual Feedback Modal */}
+      {showFeedbackForm && feedbackStudent && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`backdrop-blur-xl rounded-2xl shadow-2xl max-w-lg w-full ${dark ? "bg-gray-900/95" : "bg-white/95"}`}>
+            <div className="p-6 border-b border-gray-200/50">
+              <div className="flex items-center justify-between">
+                <h3 className={`text-xl font-bold ${dark ? "text-gray-200" : "text-gray-800"}`}>
+                  Send Feedback to {feedbackStudent.name}
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowFeedbackForm(false);
+                    setFeedbackForm({ subject: '', message: '' });
+                    setFeedbackStudent(null);
+                  }}
+                  className="w-8 h-8 bg-gray-100 hover:bg-gray-200 rounded-lg flex items-center justify-center"
+                >
+                  <svg className={`w-4 h-4 ${dark ? "text-gray-400" : "text-gray-600"}`} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+                  </svg>
+                </button>
+              </div>
+              <p className={`text-sm mt-2 ${dark ? "text-gray-400" : "text-gray-600"}`}>
+                Student ID: {feedbackStudent.studentId} &bull; {feedbackStudent.department}
+              </p>
+            </div>
+            
+            <div className="p-6">
+              <div className="space-y-4">
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? "text-gray-300" : "text-gray-700"}`}>
+                    Subject
+                  </label>
+                  <input
+                    type="text"
+                    value={feedbackForm.subject}
+                    onChange={(e) => setFeedbackForm({...feedbackForm, subject: e.target.value})}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent ${dark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-200"}`}
+                    placeholder="e.g., Feedback on your project submission..."
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? "text-gray-300" : "text-gray-700"}`}>
+                    Feedback Message
+                  </label>
+                  <textarea
+                    value={feedbackForm.message}
+                    onChange={(e) => setFeedbackForm({...feedbackForm, message: e.target.value})}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-teal-500 focus:border-transparent ${dark ? "bg-white/5 border-white/10 text-white placeholder-gray-500" : "border-gray-200"}`}
+                    rows="5"
+                    placeholder="Type your feedback here..."
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-3 mt-6">
+                <button 
+                  onClick={async () => {
+                    try {
+                      if (!feedbackForm.subject.trim() || !feedbackForm.message.trim()) {
+                        alert('Please fill in both subject and feedback message');
+                        return;
+                      }
+                      
+                      await api.post('/api/feedback/send', {
+                        senderId: teacherData.teacherId,
+                        senderName: teacherData.name,
+                        senderType: 'teacher',
+                        studentId: feedbackStudent.studentId,
+                        subject: feedbackForm.subject,
+                        message: feedbackForm.message
+                      });
+                      
+                      alert(`Feedback sent successfully to ${feedbackStudent.name}!`);
+                      setShowFeedbackForm(false);
+                      setFeedbackForm({ subject: '', message: '' });
+                      setFeedbackStudent(null);
+                    } catch (error) {
+                      alert('Error sending feedback: ' + (error.response?.data?.error || error.message));
+                    }
+                  }}
+                  className="flex-1 bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  Send Feedback
+                </button>
+                <button
+                  onClick={() => {
+                    setShowFeedbackForm(false);
+                    setFeedbackForm({ subject: '', message: '' });
+                    setFeedbackStudent(null);
+                  }}
+                  className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Certificate Scanner Modal */}
       {showScannerModal && scanningCert && (
         <CertificateScannerModal

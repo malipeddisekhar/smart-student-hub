@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
 import api from "../services/api";
+import { connectSocket, disconnectSocket } from "../services/socket";
 import LeetCodeCard from "./LeetCodeCard";
 import CodeChefCard from "./CodeChefCard";
+import ChatBot from "./ChatBot";
 
 const Dashboard = ({ studentData, onLogout }) => {
   const navigate = useNavigate();
@@ -13,6 +16,64 @@ const Dashboard = ({ studentData, onLogout }) => {
   const [showMessages, setShowMessages] = useState(false);
   const [profileData, setProfileData] = useState({});
   const [studentFullData, setStudentFullData] = useState({});
+  const [notifications, setNotifications] = useState([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [toastNotif, setToastNotif] = useState(null);
+  const socketRef = useRef(null);
+  const [dark, setDark] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('student-dark-mode')) ?? true; } catch { return true; }
+  });
+  useEffect(() => { localStorage.setItem('student-dark-mode', JSON.stringify(dark)); }, [dark]);
+
+  // Notification type icon & color map
+  const notifMeta = {
+    message: { icon: '✉️', color: 'from-blue-500 to-indigo-500', label: 'Message' },
+    feedback: { icon: '📝', color: 'from-green-500 to-emerald-500', label: 'Feedback' },
+    announcement: { icon: '📢', color: 'from-yellow-500 to-orange-500', label: 'Announcement' },
+    certificate: { icon: '🏅', color: 'from-purple-500 to-pink-500', label: 'Certificate' },
+    internship: { icon: '💼', color: 'from-teal-500 to-cyan-500', label: 'Internship' },
+    system: { icon: '⚙️', color: 'from-gray-500 to-slate-500', label: 'System' },
+  };
+
+  const timeAgo = (date) => {
+    const seconds = Math.floor((new Date() - new Date(date)) / 1000);
+    if (seconds < 60) return 'Just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
+  // Socket.IO connection + real-time listeners
+  useEffect(() => {
+    if (!studentData?.studentId) return;
+
+    const socket = connectSocket(studentData.studentId);
+    socketRef.current = socket;
+
+    // Listen for new notifications (feedback, announcements, internships, etc.)
+    socket.on('notification', (notif) => {
+      setNotifications((prev) => [notif, ...prev]);
+      setUnreadNotifCount((prev) => prev + 1);
+      // Show toast
+      setToastNotif(notif);
+      setTimeout(() => setToastNotif(null), 5000);
+    });
+
+    // Listen for new messages
+    socket.on('new-message', (message) => {
+      setMessages((prev) => [{ ...message, isRead: false }, ...prev]);
+      setUnreadCount((prev) => prev + 1);
+    });
+
+    return () => {
+      socket.off('notification');
+      socket.off('new-message');
+      disconnectSocket();
+    };
+  }, [studentData?.studentId]);
 
   useEffect(() => {
     const testConnection = async () => {
@@ -35,6 +96,21 @@ const Dashboard = ({ studentData, onLogout }) => {
           setUnreadCount(unreadRes.data.unreadCount);
         } catch (error) {
           console.error("Error fetching messages:", error);
+        }
+      }
+    };
+
+    const fetchNotifications = async () => {
+      if (studentData?.studentId) {
+        try {
+          const [notifRes, unreadRes] = await Promise.all([
+            api.get(`/api/notifications/${studentData.studentId}`),
+            api.get(`/api/notifications/unread-count/${studentData.studentId}`),
+          ]);
+          setNotifications(notifRes.data);
+          setUnreadNotifCount(unreadRes.data.unreadCount);
+        } catch (error) {
+          console.error("Error fetching notifications:", error);
         }
       }
     };
@@ -67,8 +143,31 @@ const Dashboard = ({ studentData, onLogout }) => {
 
     testConnection();
     fetchMessages();
+    fetchNotifications();
     fetchProfile();
   }, [studentData]);
+
+  const markNotificationRead = async (notifId) => {
+    try {
+      await api.put(`/api/notifications/${notifId}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === notifId ? { ...n, isRead: true, readAt: new Date() } : n))
+      );
+      setUnreadNotifCount((prev) => Math.max(0, prev - 1));
+    } catch (error) {
+      console.error("Error marking notification read:", error);
+    }
+  };
+
+  const markAllNotificationsRead = async () => {
+    try {
+      await api.put(`/api/notifications/mark-all-read/${studentData.studentId}`);
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true, readAt: new Date() })));
+      setUnreadNotifCount(0);
+    } catch (error) {
+      console.error("Error marking all notifications read:", error);
+    }
+  };
 
   const handleLogout = () => {
     onLogout();
@@ -77,7 +176,7 @@ const Dashboard = ({ studentData, onLogout }) => {
   
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className={`min-h-screen bg-gradient-to-br ${dark ? 'from-gray-950 via-slate-900 to-gray-900' : 'from-slate-50 via-blue-50 to-indigo-100'}`}>
       <nav className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-2xl border-b border-white/10">
         <div className="container mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
@@ -123,7 +222,7 @@ const Dashboard = ({ studentData, onLogout }) => {
                     setShowNotification(!showNotification);
                     setShowMessages(false);
                   }}
-                  className="bg-white/10 backdrop-blur-md hover:bg-white/20 p-3 rounded-xl transition-all duration-300 group border border-white/20"
+                  className="relative bg-white/10 backdrop-blur-md hover:bg-white/20 p-3 rounded-xl transition-all duration-300 group border border-white/20"
                 >
                   <svg
                     className="w-5 h-5 text-white group-hover:scale-110 transition-transform"
@@ -132,23 +231,79 @@ const Dashboard = ({ studentData, onLogout }) => {
                   >
                     <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
                   </svg>
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
+                      {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                    </span>
+                  )}
                 </button>
                 {showNotification && (
-                  <div className="absolute right-0 mt-3 w-80 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 animate-slideUp">
-                    <div className="p-6">
-                      <h3 className="font-semibold text-gray-800 mb-2">
-                        System Status
-                      </h3>
-                      <div className="flex items-center space-x-2">
-                        <div
-                          className={`w-3 h-3 rounded-full ${
-                            backendStatus.includes("success")
-                              ? "bg-green-500"
-                              : "bg-red-500"
-                          }`}
-                        ></div>
-                        <p className="text-sm text-gray-600">{backendStatus}</p>
+                  <div className="absolute right-0 mt-3 w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-[28rem] overflow-hidden animate-slideUp">
+                    <div className="p-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-gray-800 text-lg">Notifications</h3>
+                        <div className="flex items-center space-x-2">
+                          {unreadNotifCount > 0 && (
+                            <button
+                              onClick={markAllNotificationsRead}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                            >
+                              Mark all read
+                            </button>
+                          )}
+                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                            {unreadNotifCount} new
+                          </span>
+                        </div>
                       </div>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500">
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                            </svg>
+                          </div>
+                          <p className="font-medium">No notifications yet</p>
+                          <p className="text-sm text-gray-400 mt-1">You'll be notified about feedback, messages & more</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => {
+                          const meta = notifMeta[notif.type] || notifMeta.system;
+                          return (
+                            <div
+                              key={notif._id}
+                              className={`p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-all duration-200 ${
+                                !notif.isRead ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500" : ""
+                              }`}
+                              onClick={() => {
+                                if (!notif.isRead) markNotificationRead(notif._id);
+                              }}
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className={`w-10 h-10 bg-gradient-to-br ${meta.color} rounded-full flex items-center justify-center text-white text-lg shadow-md flex-shrink-0`}>
+                                  {meta.icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{meta.label}</span>
+                                    <span className="text-xs text-gray-400">{timeAgo(notif.createdAt)}</span>
+                                  </div>
+                                  <p className="font-semibold text-gray-800 text-sm truncate">{notif.title}</p>
+                                  <p className="text-sm text-gray-600 line-clamp-2 mt-0.5">{notif.body}</p>
+                                  {notif.senderName && (
+                                    <p className="text-xs text-gray-400 mt-1">From: {notif.senderName}</p>
+                                  )}
+                                </div>
+                                {!notif.isRead && (
+                                  <span className="inline-block w-2.5 h-2.5 bg-blue-500 rounded-full mt-1 animate-pulse flex-shrink-0"></span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   </div>
                 )}
@@ -259,6 +414,17 @@ const Dashboard = ({ studentData, onLogout }) => {
                 )}
               </div>
               <button
+                onClick={() => setDark(!dark)}
+                className="bg-white/10 backdrop-blur-md hover:bg-white/20 p-3 rounded-xl transition-all duration-300 border border-white/20"
+                title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              >
+                {dark ? (
+                  <svg className="w-5 h-5 text-yellow-300" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd"/></svg>
+                ) : (
+                  <svg className="w-5 h-5 text-blue-200" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+                )}
+              </button>
+              <button
                 onClick={handleLogout}
                 className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 px-6 py-2 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
               >
@@ -270,8 +436,13 @@ const Dashboard = ({ studentData, onLogout }) => {
       </nav>
 
       <div className="container mx-auto px-6 py-8">
-        <div className="bg-white/70 backdrop-blur-2xl rounded-3xl shadow-2xl p-8 mb-10 border border-white/30 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5"></div>
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className={`backdrop-blur-2xl rounded-3xl shadow-2xl p-8 mb-10 border relative overflow-hidden ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/30'}`}
+        >
+          <div className={`absolute inset-0 ${dark ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10' : 'bg-gradient-to-r from-blue-500/5 to-indigo-500/5'}`}></div>
           <div className="relative z-10">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center space-y-6 lg:space-y-0">
               <div className="flex items-center space-x-6">
@@ -302,17 +473,17 @@ const Dashboard = ({ studentData, onLogout }) => {
                   </div>
                 </div>
                 <div>
-                  <h2 className="text-4xl font-bold bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800 bg-clip-text text-transparent mb-3">
+                  <h2 className={`text-4xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-3 ${dark ? 'from-white via-blue-200 to-indigo-300' : 'from-slate-800 via-blue-800 to-indigo-800'}`}>
                     Welcome back, {studentData?.name || "Student"}!
                   </h2>
                   <div className="flex items-center space-x-4">
-                    <div className="bg-blue-100 px-4 py-2 rounded-full">
-                      <p className="text-blue-800 font-semibold text-sm">
+                    <div className={`px-4 py-2 rounded-full ${dark ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
+                      <p className={`font-semibold text-sm ${dark ? 'text-blue-300' : 'text-blue-800'}`}>
                         ID: {studentData?.studentId}
                       </p>
                     </div>
-                    <div className="bg-green-100 px-4 py-2 rounded-full">
-                      <p className="text-green-800 font-semibold text-sm">
+                    <div className={`px-4 py-2 rounded-full ${dark ? 'bg-green-500/20' : 'bg-green-100'}`}>
+                      <p className={`font-semibold text-sm ${dark ? 'text-green-300' : 'text-green-800'}`}>
                         Active Student
                       </p>
                     </div>
@@ -357,11 +528,14 @@ const Dashboard = ({ studentData, onLogout }) => {
               </div>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          <div
-            className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
             onClick={() => navigate("/academic-records")}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -381,20 +555,23 @@ const Dashboard = ({ studentData, onLogout }) => {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-blue-700 transition-colors">
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-blue-400" : "text-gray-800 group-hover:text-blue-700"}`}>
                 Academic Records
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 View your academic performance and track your progress
               </p>
               <div className="mt-4 flex items-center text-blue-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
                 <span className="text-sm">Explore →</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div
-            className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
             onClick={() => navigate("/academic-certificates")}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -414,20 +591,23 @@ const Dashboard = ({ studentData, onLogout }) => {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-green-700 transition-colors">
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-green-400" : "text-gray-800 group-hover:text-green-700"}`}>
                 Academic Certificates
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 Manage and showcase your academic achievements
               </p>
               <div className="mt-4 flex items-center text-green-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
                 <span className="text-sm">Manage →</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div
-            className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.3 }}
+            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
             onClick={() => navigate("/personal-achievements")}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -447,20 +627,23 @@ const Dashboard = ({ studentData, onLogout }) => {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-orange-700 transition-colors">
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-orange-400" : "text-gray-800 group-hover:text-orange-700"}`}>
                 Personal Achievements
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 Track your personal certificates and accomplishments
               </p>
               <div className="mt-4 flex items-center text-orange-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
                 <span className="text-sm">View →</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div
-            className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.4 }}
+            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
             onClick={() => navigate("/profile")}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -480,20 +663,23 @@ const Dashboard = ({ studentData, onLogout }) => {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-purple-700 transition-colors">
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-purple-400" : "text-gray-800 group-hover:text-purple-700"}`}>
                 Profile Management
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 Update your personal details and documents
               </p>
               <div className="mt-4 flex items-center text-purple-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
                 <span className="text-sm">Edit →</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div
-            className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
             onClick={() => navigate("/projects")}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -513,20 +699,23 @@ const Dashboard = ({ studentData, onLogout }) => {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-indigo-700 transition-colors">
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-indigo-400" : "text-gray-800 group-hover:text-indigo-700"}`}>
                 Project Portfolio
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 Showcase your projects and technical work
               </p>
               <div className="mt-4 flex items-center text-indigo-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
                 <span className="text-sm">Add →</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div
-            className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
             onClick={() => navigate("/professional-portfolio")}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -546,20 +735,23 @@ const Dashboard = ({ studentData, onLogout }) => {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-purple-700 transition-colors">
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-purple-400" : "text-gray-800 group-hover:text-purple-700"}`}>
                 Professional Portfolio
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 Generate professional portfolios and resumes with certifications, skills & projects
               </p>
               <div className="mt-4 flex items-center text-purple-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
                 <span className="text-sm">Generate →</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div
-            className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.7 }}
+            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
             onClick={() => navigate("/resume-editor")}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -579,20 +771,23 @@ const Dashboard = ({ studentData, onLogout }) => {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-teal-700 transition-colors">
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-teal-400" : "text-gray-800 group-hover:text-teal-700"}`}>
                 Resume & Portfolio Editor
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 Edit your resume & portfolio content in one place — changes reflect everywhere
               </p>
               <div className="mt-4 flex items-center text-teal-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
                 <span className="text-sm">Edit →</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
-          <div
-            className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden"
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.8 }}
+            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
             onClick={() => navigate("/resume-analyzer")}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -612,23 +807,57 @@ const Dashboard = ({ studentData, onLogout }) => {
                   />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-rose-700 transition-colors">
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-rose-400" : "text-gray-800 group-hover:text-rose-700"}`}>
                 AI Resume Analyzer
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 AI-powered resume analysis with real internship recommendations from top platforms
               </p>
               <div className="mt-4 flex items-center text-rose-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
                 <span className="text-sm">Analyze →</span>
               </div>
             </div>
-          </div>
+          </motion.div>
 
           <LeetCodeCard studentData={studentData} />
           <CodeChefCard studentData={studentData} />
 
         </div>
       </div>
+
+      {/* Toast notification popup */}
+      {toastNotif && (
+        <motion.div
+          initial={{ opacity: 0, y: 50, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 50, scale: 0.9 }}
+          className="fixed bottom-6 right-6 z-[100]"
+        >
+          <div className={`rounded-2xl shadow-2xl border p-4 max-w-sm flex items-start space-x-3 ${dark ? "bg-gray-900 border-white/10" : "bg-white border-gray-200"}`}>
+            <div className={`w-10 h-10 bg-gradient-to-br ${(notifMeta[toastNotif.type] || notifMeta.system).color} rounded-full flex items-center justify-center text-white text-lg shadow-md flex-shrink-0`}>
+              {(notifMeta[toastNotif.type] || notifMeta.system).icon}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-gray-800 text-sm">{toastNotif.title}</p>
+              <p className="text-sm text-gray-600 line-clamp-2 mt-0.5">{toastNotif.body}</p>
+              {toastNotif.senderName && (
+                <p className="text-xs text-gray-400 mt-1">From: {toastNotif.senderName}</p>
+              )}
+            </div>
+            <button
+              onClick={() => setToastNotif(null)}
+              className="text-gray-400 hover:text-gray-600 flex-shrink-0"
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* AI Chatbot */}
+      <ChatBot studentData={studentData} />
     </div>
   );
 };

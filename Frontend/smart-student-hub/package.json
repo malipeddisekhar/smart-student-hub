@@ -10,12 +10,17 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
     "axios": "^1.12.2",
+    "framer-motion": "^12.34.1",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^3.0.2",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
-    "react-router-dom": "^7.9.1"
+    "react-router-dom": "^7.9.1",
+    "socket.io-client": "^4.8.3",
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.33.0",

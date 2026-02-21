@@ -18,6 +18,9 @@ const { OAuth2Client } = require('google-auth-library');
 const { fetchLeetCodeStats } = require("./utils/leetcodeService");
 const { fetchCodeChefStats } = require("./utils/codechefService");
 const { buildStudentProfile, analyzeResumeWithAI } = require("./utils/resumeAnalyzerAI");
+const Notification = require("./models/Notification");
+const http = require('http');
+const { Server } = require('socket.io');
 
 const cloudinary = require("cloudinary").v2;
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -51,6 +54,39 @@ function escapeRegExp(string) {
 
 const app = express();
 const port = process.env.PORT || 3000;
+
+// Create HTTP server and attach Socket.IO
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: [
+      'http://localhost:5173',
+      'https://sih-smart-student-hub-2.onrender.com'
+    ],
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  console.log('🔌 Client connected:', socket.id);
+
+  // Students/teachers join a room based on their userId
+  socket.on('join', (userId) => {
+    if (userId) {
+      socket.join(userId);
+      console.log(`👤 ${userId} joined room`);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🔌 Client disconnected:', socket.id);
+  });
+});
+
+// Make io accessible in routes
+app.set('io', io);
 
 // ✅ Replace disk storage with Cloudinary Storage
 const storage = new CloudinaryStorage({
@@ -529,7 +565,7 @@ app.get('/api/review/academic-certificates', async (req, res) => {
 app.post('/api/review/academic-certificates/:studentId/:certificateId/approve', async (req, res) => {
   try {
     const { studentId, certificateId } = req.params;
-    const { feedback } = req.body;
+    const { feedback, teacherId, teacherName } = req.body;
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
@@ -539,7 +575,50 @@ app.post('/api/review/academic-certificates/:studentId/:certificateId/approve', 
     cert.status = 'approved';
     cert.feedback = feedback || '';
     cert.reviewedAt = new Date();
+    cert.reviewedByTeacherId = teacherId || '';
+    cert.reviewedByTeacherName = teacherName || '';
     await student.save();
+
+    // Create notification & message for student
+    const senderName = teacherName || 'Faculty';
+    const feedbackText = feedback ? `\nFaculty Feedback: ${feedback}` : '';
+    const notifTitle = `Certificate Approved: ${cert.certificateName || 'Certificate'}`;
+    const notifBody = `Your ${cert.certificateName || 'certificate'} has been approved by ${senderName}.${feedbackText}`;
+
+    const notification = new Notification({
+      recipientId: studentId,
+      recipientType: 'student',
+      type: 'certificate',
+      title: notifTitle,
+      body: notifBody,
+      senderId: teacherId || '',
+      senderName,
+      link: '/academic-certificates'
+    });
+    await notification.save();
+
+    const newMessage = new Message({
+      senderId: teacherId || '',
+      senderName,
+      senderType: 'teacher',
+      recipients: [{ studentId, studentName: student.name, isRead: false }],
+      subject: notifTitle,
+      message: notifBody,
+      groupId: 'certificate-review',
+      groupName: 'Certificate Review'
+    });
+    await newMessage.save();
+
+    const io = req.app.get('io');
+    io.to(studentId).emit('notification', {
+      _id: notification._id, type: 'certificate', title: notifTitle,
+      body: notifBody, senderName, createdAt: notification.createdAt, isRead: false
+    });
+    io.to(studentId).emit('new-message', {
+      _id: newMessage._id, senderId: teacherId || '', senderName,
+      subject: notifTitle, message: notifBody,
+      groupName: 'Certificate Review', createdAt: newMessage.createdAt, isRead: false
+    });
 
     res.json({ message: 'Certificate approved' });
   } catch (error) {
@@ -550,7 +629,7 @@ app.post('/api/review/academic-certificates/:studentId/:certificateId/approve', 
 app.post('/api/review/academic-certificates/:studentId/:certificateId/reject', async (req, res) => {
   try {
     const { studentId, certificateId } = req.params;
-    const { feedback } = req.body;
+    const { feedback, teacherId, teacherName } = req.body;
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
@@ -560,7 +639,50 @@ app.post('/api/review/academic-certificates/:studentId/:certificateId/reject', a
     cert.status = 'rejected';
     cert.feedback = feedback || '';
     cert.reviewedAt = new Date();
+    cert.reviewedByTeacherId = teacherId || '';
+    cert.reviewedByTeacherName = teacherName || '';
     await student.save();
+
+    // Create notification & message for student
+    const senderName = teacherName || 'Faculty';
+    const feedbackText = feedback ? `\nFaculty Feedback: ${feedback}` : '';
+    const notifTitle = `Certificate Rejected: ${cert.certificateName || 'Certificate'}`;
+    const notifBody = `Your ${cert.certificateName || 'certificate'} was rejected by ${senderName}.${feedbackText}`;
+
+    const notification = new Notification({
+      recipientId: studentId,
+      recipientType: 'student',
+      type: 'certificate',
+      title: notifTitle,
+      body: notifBody,
+      senderId: teacherId || '',
+      senderName,
+      link: '/academic-certificates'
+    });
+    await notification.save();
+
+    const newMessage = new Message({
+      senderId: teacherId || '',
+      senderName,
+      senderType: 'teacher',
+      recipients: [{ studentId, studentName: student.name, isRead: false }],
+      subject: notifTitle,
+      message: notifBody,
+      groupId: 'certificate-review',
+      groupName: 'Certificate Review'
+    });
+    await newMessage.save();
+
+    const io = req.app.get('io');
+    io.to(studentId).emit('notification', {
+      _id: notification._id, type: 'certificate', title: notifTitle,
+      body: notifBody, senderName, createdAt: notification.createdAt, isRead: false
+    });
+    io.to(studentId).emit('new-message', {
+      _id: newMessage._id, senderId: teacherId || '', senderName,
+      subject: notifTitle, message: notifBody,
+      groupName: 'Certificate Review', createdAt: newMessage.createdAt, isRead: false
+    });
 
     res.json({ message: 'Certificate rejected' });
   } catch (error) {
@@ -703,7 +825,7 @@ app.get('/api/scan-status/:studentId/:certificateId', async (req, res) => {
 app.post('/api/review/academic-certificates/:studentId/:certificateId/approve-with-scan', async (req, res) => {
   try {
     const { studentId, certificateId } = req.params;
-    const { feedback } = req.body;
+    const { feedback, teacherId, teacherName } = req.body;
     
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -733,7 +855,50 @@ app.post('/api/review/academic-certificates/:studentId/:certificateId/approve-wi
     cert.status = 'approved';
     cert.feedback = feedback || '';
     cert.reviewedAt = new Date();
+    cert.reviewedByTeacherId = teacherId || '';
+    cert.reviewedByTeacherName = teacherName || '';
     await student.save();
+
+    // Create notification & message for student
+    const senderName = teacherName || 'Faculty';
+    const feedbackText = feedback ? `\nFaculty Feedback: ${feedback}` : '';
+    const notifTitle = `Certificate Approved: ${cert.certificateName || 'Certificate'}`;
+    const notifBody = `Your ${cert.certificateName || 'certificate'} has been approved by ${senderName}.${feedbackText}`;
+
+    const notification = new Notification({
+      recipientId: studentId,
+      recipientType: 'student',
+      type: 'certificate',
+      title: notifTitle,
+      body: notifBody,
+      senderId: teacherId || '',
+      senderName,
+      link: '/academic-certificates'
+    });
+    await notification.save();
+
+    const newMessage = new Message({
+      senderId: teacherId || '',
+      senderName,
+      senderType: 'teacher',
+      recipients: [{ studentId, studentName: student.name, isRead: false }],
+      subject: notifTitle,
+      message: notifBody,
+      groupId: 'certificate-review',
+      groupName: 'Certificate Review'
+    });
+    await newMessage.save();
+
+    const io = req.app.get('io');
+    io.to(studentId).emit('notification', {
+      _id: notification._id, type: 'certificate', title: notifTitle,
+      body: notifBody, senderName, createdAt: notification.createdAt, isRead: false
+    });
+    io.to(studentId).emit('new-message', {
+      _id: newMessage._id, senderId: teacherId || '', senderName,
+      subject: notifTitle, message: notifBody,
+      groupName: 'Certificate Review', createdAt: newMessage.createdAt, isRead: false
+    });
 
     res.json({ message: 'Certificate approved' });
   } catch (error) {
@@ -745,7 +910,7 @@ app.post('/api/review/academic-certificates/:studentId/:certificateId/approve-wi
 app.post('/api/review/academic-certificates/:studentId/:certificateId/reject-with-scan', async (req, res) => {
   try {
     const { studentId, certificateId } = req.params;
-    const { feedback } = req.body;
+    const { feedback, teacherId, teacherName } = req.body;
     
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -767,11 +932,97 @@ app.post('/api/review/academic-certificates/:studentId/:certificateId/reject-wit
     cert.status = 'rejected';
     cert.feedback = feedback || '';
     cert.reviewedAt = new Date();
+    cert.reviewedByTeacherId = teacherId || '';
+    cert.reviewedByTeacherName = teacherName || '';
     await student.save();
+
+    // Create notification & message for student
+    const senderName = teacherName || 'Faculty';
+    const feedbackText = feedback ? `\nFaculty Feedback: ${feedback}` : '';
+    const notifTitle = `Certificate Rejected: ${cert.certificateName || 'Certificate'}`;
+    const notifBody = `Your ${cert.certificateName || 'certificate'} was rejected by ${senderName}.${feedbackText}`;
+
+    const notification = new Notification({
+      recipientId: studentId,
+      recipientType: 'student',
+      type: 'certificate',
+      title: notifTitle,
+      body: notifBody,
+      senderId: teacherId || '',
+      senderName,
+      link: '/academic-certificates'
+    });
+    await notification.save();
+
+    const newMessage = new Message({
+      senderId: teacherId || '',
+      senderName,
+      senderType: 'teacher',
+      recipients: [{ studentId, studentName: student.name, isRead: false }],
+      subject: notifTitle,
+      message: notifBody,
+      groupId: 'certificate-review',
+      groupName: 'Certificate Review'
+    });
+    await newMessage.save();
+
+    const io = req.app.get('io');
+    io.to(studentId).emit('notification', {
+      _id: notification._id, type: 'certificate', title: notifTitle,
+      body: notifBody, senderName, createdAt: notification.createdAt, isRead: false
+    });
+    io.to(studentId).emit('new-message', {
+      _id: newMessage._id, senderId: teacherId || '', senderName,
+      subject: notifTitle, message: notifBody,
+      groupName: 'Certificate Review', createdAt: newMessage.createdAt, isRead: false
+    });
 
     res.json({ message: 'Certificate rejected' });
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// ---------------------
+// Teacher certificate review stats
+// ---------------------
+app.get('/api/teacher/certificate-stats/:teacherId', async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    const students = await Student.find({ 'academicCertificates.reviewedByTeacherId': teacherId });
+    
+    let approved = 0;
+    let rejected = 0;
+    const recentReviews = [];
+    
+    for (const student of students) {
+      for (const cert of (student.academicCertificates || [])) {
+        if (cert.reviewedByTeacherId === teacherId) {
+          if (cert.status === 'approved') approved++;
+          if (cert.status === 'rejected') rejected++;
+          recentReviews.push({
+            certificateName: cert.certificateName,
+            studentName: student.name,
+            studentId: student.studentId,
+            status: cert.status,
+            reviewedAt: cert.reviewedAt,
+            feedback: cert.feedback
+          });
+        }
+      }
+    }
+    
+    // Sort recent reviews by date descending
+    recentReviews.sort((a, b) => new Date(b.reviewedAt) - new Date(a.reviewedAt));
+    
+    res.json({
+      approved,
+      rejected,
+      total: approved + rejected,
+      recentReviews: recentReviews.slice(0, 20)
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -1040,6 +1291,98 @@ app.put('/api/portfolio-data/:studentId', async (req, res) => {
 });
 
 // ============================================
+// AI Chatbot
+// ============================================
+const Groq = require("groq-sdk");
+let _groqInstance = null;
+function getGroqClient() {
+  if (!_groqInstance) {
+    _groqInstance = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  }
+  return _groqInstance;
+}
+
+const CHATBOT_SYSTEM_PROMPT = `You are "Smart Hub AI", the helpful assistant for the Smart Student Hub platform — an academic management system for college students, teachers, and admins.
+
+You can help students with:
+- Navigating the platform (academic records, certificates, projects, profile, portfolio, resume editor, resume analyzer, LeetCode/CodeChef stats)
+- Academic guidance (study tips, exam preparation, CGPA improvement)
+- Career advice (internships, placements, resume tips, skill development)
+- Certificate guidance (how to upload, status tracking — pending/approved/rejected)
+- Coding practice (LeetCode, CodeChef tips and problem-solving strategies)
+- General college-related questions
+
+Platform features you should know:
+1. Academic Records — Students can view semester marks, SGPA, CGPA
+2. Academic Certificates — Upload certificates (internship, NPTEL, etc.), teachers review & approve/reject with feedback
+3. Personal Achievements — Track personal certificates
+4. Profile Management — Update personal details, skills, LinkedIn, GitHub
+5. Project Portfolio — Showcase projects with descriptions, tech stack, links
+6. Professional Portfolio — Auto-generated portfolio/resume from profile data
+7. Resume & Portfolio Editor — Edit resume content in one place
+8. AI Resume Analyzer — AI-powered resume analysis with internship recommendations
+9. LeetCode & CodeChef Cards — Track coding progress, auto-refreshed stats
+10. Messages & Notifications — Real-time notifications from teachers, certificate feedback
+
+Keep responses concise, friendly, and helpful. Use emojis sparingly. If asked about something unrelated to academics/careers/the platform, politely redirect. If you don't know something specific about the platform, say so honestly.`;
+
+app.post('/api/chatbot', async (req, res) => {
+  try {
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(500).json({ error: 'Chatbot is not configured. GROQ_API_KEY missing.' });
+    }
+
+    const { messages, studentContext } = req.body;
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return res.status(400).json({ error: 'Messages array is required' });
+    }
+
+    // Build context-aware system message
+    let systemMsg = CHATBOT_SYSTEM_PROMPT;
+    if (studentContext) {
+      systemMsg += `\n\nCurrent student context:\n- Name: ${studentContext.name || 'Unknown'}\n- Student ID: ${studentContext.studentId || 'N/A'}\n- Department: ${studentContext.department || 'N/A'}\n- College: ${studentContext.college || 'N/A'}\n- Year: ${studentContext.year || 'N/A'}, Semester: ${studentContext.semester || 'N/A'}`;
+    }
+
+    // Format messages for Groq
+    const chatMessages = [
+      { role: 'system', content: systemMsg },
+      ...messages.slice(-10).map(m => ({
+        role: m.role === 'user' ? 'user' : 'assistant',
+        content: m.content
+      }))
+    ];
+
+    const models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
+    let lastError = null;
+
+    for (const modelName of models) {
+      try {
+        const completion = await getGroqClient().chat.completions.create({
+          messages: chatMessages,
+          model: modelName,
+          temperature: 0.7,
+          max_tokens: 1024,
+          top_p: 0.9
+        });
+
+        const reply = completion.choices[0]?.message?.content;
+        if (reply) {
+          return res.json({ reply, model: modelName });
+        }
+      } catch (err) {
+        lastError = err;
+        console.log(`[Chatbot] Model ${modelName} failed, trying next...`);
+      }
+    }
+
+    throw lastError || new Error('All models failed');
+  } catch (error) {
+    console.error('Chatbot error:', error.message);
+    res.status(500).json({ error: 'Failed to get response. Please try again.' });
+  }
+});
+
+// ============================================
 // AI Resume Analysis & Internship Recommendations
 // ============================================
 app.get('/api/resume-analysis/:studentId', async (req, res) => {
@@ -1175,8 +1518,19 @@ app.get('/api/leetcode/:studentId', async (req, res) => {
   }
 });
 
+// ---------------------
+// Leaderboard with in-memory cache (60s TTL)
+// ---------------------
+const leaderboardCache = { combined: null, leetcode: null, codechef: null };
+const leaderboardCacheTime = { combined: 0, leetcode: 0, codechef: 0 };
+const LEADERBOARD_CACHE_TTL = 60 * 1000; // 60 seconds
+
 app.get('/api/leaderboard', async (req, res) => {
   try {
+    const now = Date.now();
+    if (leaderboardCache.combined && (now - leaderboardCacheTime.combined) < LEADERBOARD_CACHE_TTL) {
+      return res.json(leaderboardCache.combined);
+    }
     const students = await Student.find(
       {
         $or: [
@@ -1212,6 +1566,8 @@ app.get('/api/leaderboard', async (req, res) => {
       rank: index + 1
     }));
 
+    leaderboardCache.combined = leaderboard;
+    leaderboardCacheTime.combined = Date.now();
     res.json(leaderboard);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -1221,6 +1577,10 @@ app.get('/api/leaderboard', async (req, res) => {
 // LeetCode-only leaderboard
 app.get('/api/leaderboard/leetcode', async (req, res) => {
   try {
+    const now = Date.now();
+    if (leaderboardCache.leetcode && (now - leaderboardCacheTime.leetcode) < LEADERBOARD_CACHE_TTL) {
+      return res.json(leaderboardCache.leetcode);
+    }
     const students = await Student.find(
       { leetcodeUsername: { $exists: true, $ne: null } },
       { 
@@ -1245,6 +1605,8 @@ app.get('/api/leaderboard/leetcode', async (req, res) => {
         rank: index + 1
       }));
 
+    leaderboardCache.leetcode = leaderboard;
+    leaderboardCacheTime.leetcode = Date.now();
     res.json(leaderboard);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -1254,6 +1616,10 @@ app.get('/api/leaderboard/leetcode', async (req, res) => {
 // CodeChef-only leaderboard
 app.get('/api/leaderboard/codechef', async (req, res) => {
   try {
+    const now = Date.now();
+    if (leaderboardCache.codechef && (now - leaderboardCacheTime.codechef) < LEADERBOARD_CACHE_TTL) {
+      return res.json(leaderboardCache.codechef);
+    }
     const students = await Student.find(
       { codechefUsername: { $exists: true, $ne: null } },
       { 
@@ -1278,6 +1644,8 @@ app.get('/api/leaderboard/codechef', async (req, res) => {
         rank: index + 1
       }));
 
+    leaderboardCache.codechef = leaderboard;
+    leaderboardCacheTime.codechef = Date.now();
     res.json(leaderboard);
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -1494,8 +1862,269 @@ const autoRefreshAllStats = async () => {
   }
 };
 
-app.listen(port, () => {
+// ---------------------
+// Message routes (teacher -> students)
+// ---------------------
+app.post('/api/messages/send', async (req, res) => {
+  try {
+    const { senderId, senderName, senderType, groupId, subject, message } = req.body;
+
+    if (!senderId || !senderName || !groupId || !subject || !message) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    // Find the group to get student list
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    // Build recipients from group students
+    const students = await Student.find({ studentId: { $in: group.students } });
+    const recipients = students.map(s => ({
+      studentId: s.studentId,
+      studentName: s.name,
+      isRead: false
+    }));
+
+    // Save message
+    const newMessage = new Message({
+      senderId,
+      senderName,
+      senderType: senderType || 'teacher',
+      recipients,
+      subject,
+      message,
+      groupId: group._id.toString(),
+      groupName: group.name
+    });
+    await newMessage.save();
+
+    // Create notifications + emit real-time events for each student
+    const io = req.app.get('io');
+    for (const student of students) {
+      const notification = new Notification({
+        recipientId: student.studentId,
+        recipientType: 'student',
+        type: 'message',
+        title: `New message: ${subject}`,
+        body: message.substring(0, 200),
+        senderId,
+        senderName,
+        link: '/dashboard'
+      });
+      await notification.save();
+
+      // Push real-time notification to student
+      io.to(student.studentId).emit('notification', {
+        _id: notification._id,
+        type: 'message',
+        title: notification.title,
+        body: notification.body,
+        senderName,
+        createdAt: notification.createdAt,
+        isRead: false
+      });
+
+      // Also emit the new message itself
+      io.to(student.studentId).emit('new-message', {
+        _id: newMessage._id,
+        senderId,
+        senderName,
+        subject,
+        message,
+        groupName: group.name,
+        createdAt: newMessage.createdAt,
+        isRead: false
+      });
+    }
+
+    res.status(201).json({ message: 'Message sent successfully', messageId: newMessage._id });
+  } catch (error) {
+    console.error('Error sending message:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get messages for a student
+app.get('/api/messages/student/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const messages = await Message.find({ 'recipients.studentId': studentId })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    // Map to include isRead status for this student
+    const formatted = messages.map(msg => {
+      const recipient = msg.recipients.find(r => r.studentId === studentId);
+      return {
+        _id: msg._id,
+        senderId: msg.senderId,
+        senderName: msg.senderName,
+        senderType: msg.senderType,
+        subject: msg.subject,
+        message: msg.message,
+        groupName: msg.groupName,
+        createdAt: msg.createdAt,
+        isRead: recipient?.isRead || false,
+        readAt: recipient?.readAt || null
+      };
+    });
+
+    res.json(formatted);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get unread message count for a student
+app.get('/api/messages/unread-count/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const messages = await Message.find({
+      'recipients': {
+        $elemMatch: { studentId, isRead: false }
+      }
+    });
+    res.json({ unreadCount: messages.length });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Mark message as read
+app.put('/api/messages/:messageId/read/:studentId', async (req, res) => {
+  try {
+    const { messageId, studentId } = req.params;
+    await Message.updateOne(
+      { _id: messageId, 'recipients.studentId': studentId },
+      { $set: { 'recipients.$.isRead': true, 'recipients.$.readAt': new Date() } }
+    );
+    res.json({ message: 'Marked as read' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// ---------------------
+// Notification routes
+// ---------------------
+
+// Get notifications for a user
+app.get('/api/notifications/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const notifications = await Notification.find({ recipientId: userId })
+      .sort({ createdAt: -1 })
+      .limit(50);
+    res.json(notifications);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get unread notification count
+app.get('/api/notifications/unread-count/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const count = await Notification.countDocuments({ recipientId: userId, isRead: false });
+    res.json({ unreadCount: count });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Mark single notification as read
+app.put('/api/notifications/:notificationId/read', async (req, res) => {
+  try {
+    const { notificationId } = req.params;
+    await Notification.findByIdAndUpdate(notificationId, { isRead: true, readAt: new Date() });
+    res.json({ message: 'Notification marked as read' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Mark all notifications as read for a user
+app.put('/api/notifications/mark-all-read/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    await Notification.updateMany(
+      { recipientId: userId, isRead: false },
+      { $set: { isRead: true, readAt: new Date() } }
+    );
+    res.json({ message: 'All notifications marked as read' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Teacher sends individual feedback to a student (creates notification)
+app.post('/api/feedback/send', async (req, res) => {
+  try {
+    const { senderId, senderName, studentId, subject, message } = req.body;
+    if (!senderId || !senderName || !studentId || !subject || !message) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    // Save as a direct message (1-to-1)
+    const newMessage = new Message({
+      senderId,
+      senderName,
+      senderType: 'teacher',
+      recipients: [{ studentId: student.studentId, studentName: student.name, isRead: false }],
+      subject,
+      message,
+      groupId: 'direct',
+      groupName: 'Direct Feedback'
+    });
+    await newMessage.save();
+
+    // Create notification
+    const notification = new Notification({
+      recipientId: student.studentId,
+      recipientType: 'student',
+      type: 'feedback',
+      title: `Feedback from ${senderName}: ${subject}`,
+      body: message.substring(0, 200),
+      senderId,
+      senderName,
+      link: '/dashboard'
+    });
+    await notification.save();
+
+    // Push real-time
+    const io = req.app.get('io');
+    io.to(student.studentId).emit('notification', {
+      _id: notification._id,
+      type: 'feedback',
+      title: notification.title,
+      body: notification.body,
+      senderName,
+      createdAt: notification.createdAt,
+      isRead: false
+    });
+    io.to(student.studentId).emit('new-message', {
+      _id: newMessage._id,
+      senderId,
+      senderName,
+      subject,
+      message,
+      groupName: 'Direct Feedback',
+      createdAt: newMessage.createdAt,
+      isRead: false
+    });
+
+    res.status(201).json({ message: 'Feedback sent successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+server.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
+  console.log('🔌 Socket.IO ready for real-time notifications');
   // Run first auto-refresh 1 minute after server starts
   setTimeout(autoRefreshAllStats, 60 * 1000);
   // Then every 30 minutes

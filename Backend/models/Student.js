@@ -82,6 +82,8 @@ const academicCertificateSchema = new mongoose.Schema({
     default: Date.now
   },
   reviewedAt: Date,
+  reviewedByTeacherId: { type: String },
+  reviewedByTeacherName: { type: String },
   
   // Scan-based verification fields
   scanStatus: { 

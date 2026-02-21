@@ -7,7 +7,15 @@ const Leaderboard = ({ studentData }) => {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [platform, setPlatform] = useState("leetcode"); // "leetcode" or "codechef"
+  const [platform, setPlatform] = useState("leetcode");
+  const [dark, setDark] = useState(() => {
+    const saved = localStorage.getItem("leaderboard-dark-mode");
+    return saved !== null ? saved === "true" : true; // default dark
+  });
+
+  useEffect(() => {
+    localStorage.setItem("leaderboard-dark-mode", dark);
+  }, [dark]);
 
   useEffect(() => {
     const fetchLeaderboard = async () => {
@@ -36,10 +44,10 @@ const Leaderboard = ({ studentData }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className={`min-h-screen transition-colors duration-500 ${dark ? "bg-gradient-to-br from-gray-950 via-slate-900 to-gray-900" : "bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100"}`}>
       {/* Navbar */}
       {studentData && (
-        <nav className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-2xl border-b border-white/10">
+        <nav className={`shadow-2xl border-b transition-colors duration-500 ${dark ? "bg-slate-900/90 backdrop-blur-xl border-white/5 text-white" : "bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white border-white/10"}`}>
           <div className="container mx-auto px-6 py-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-4">
@@ -56,7 +64,21 @@ const Leaderboard = ({ studentData }) => {
                   Smart Student Hub
                 </h1>
               </div>
-              <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-4">
+                {/* Dark Mode Toggle */}
+                <button
+                  onClick={() => setDark(!dark)}
+                  className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none ${dark ? "bg-indigo-600" : "bg-gray-300"}`}
+                  title={dark ? "Switch to light mode" : "Switch to dark mode"}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center transition-transform duration-300 ${dark ? "translate-x-7" : "translate-x-0"}`}>
+                    {dark ? (
+                      <svg className="w-3.5 h-3.5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" /></svg>
+                    )}
+                  </span>
+                </button>
                 <button
                   onClick={() => navigate("/dashboard")}
                   className="bg-white/10 backdrop-blur-md hover:bg-white/20 px-6 py-2 rounded-xl transition-all duration-300 border border-white/20 text-white font-medium"
@@ -77,16 +99,35 @@ const Leaderboard = ({ studentData }) => {
 
       {/* Main Content */}
       <div className="container mx-auto px-6 py-12">
-        <div className="bg-white/70 backdrop-blur-2xl rounded-3xl shadow-2xl p-8 border border-white/30 mb-8">
+        <div className={`backdrop-blur-2xl rounded-3xl shadow-2xl p-8 border mb-8 transition-colors duration-500 ${dark ? "bg-slate-800/70 border-slate-700/50" : "bg-white/70 border-white/30"}`}>
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-5xl font-bold bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800 bg-clip-text text-transparent mb-2">
+              <h1 className={`text-5xl font-bold bg-clip-text text-transparent mb-2 ${dark ? "bg-gradient-to-r from-white via-blue-200 to-indigo-300" : "bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800"}`}>
                 {platform === "leetcode" ? "LeetCode" : "CodeChef"} Leaderboard
               </h1>
-              <p className="text-gray-600 text-lg">
+              <p className={`text-lg ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 Top students by problems solved
               </p>
             </div>
+            {/* Dark mode toggle for non-logged-in users (no navbar) */}
+            {!studentData && (
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setDark(!dark)}
+                  className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none ${dark ? "bg-indigo-600" : "bg-gray-300"}`}
+                  title={dark ? "Switch to light mode" : "Switch to dark mode"}
+                >
+                  <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-md flex items-center justify-center transition-transform duration-300 ${dark ? "translate-x-7" : "translate-x-0"}`}>
+                    {dark ? (
+                      <svg className="w-3.5 h-3.5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" /></svg>
+                    ) : (
+                      <svg className="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" /></svg>
+                    )}
+                  </span>
+                </button>
+              </div>
+            )}
+            {studentData && (
             <div className={`w-24 h-24 bg-gradient-to-br ${
               platform === "leetcode" 
                 ? "from-orange-500 to-red-600" 
@@ -106,17 +147,18 @@ const Leaderboard = ({ studentData }) => {
                 />
               </svg>
             </div>
+            )}
           </div>
 
           {/* Platform Toggle */}
           <div className="mb-6">
-            <div className="flex items-center gap-4 bg-gradient-to-r from-slate-100 to-blue-100 p-2 rounded-2xl w-fit">
+            <div className={`flex items-center gap-4 p-2 rounded-2xl w-fit transition-colors duration-500 ${dark ? "bg-slate-700/60" : "bg-gradient-to-r from-slate-100 to-blue-100"}`}>
               <button
                 onClick={() => setPlatform("leetcode")}
                 className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
                   platform === "leetcode"
                     ? "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg scale-105"
-                    : "bg-transparent text-gray-600 hover:bg-white/50"
+                    : dark ? "bg-transparent text-gray-400 hover:bg-slate-600/50" : "bg-transparent text-gray-600 hover:bg-white/50"
                 }`}
               >
                 LeetCode
@@ -126,7 +168,7 @@ const Leaderboard = ({ studentData }) => {
                 className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
                   platform === "codechef"
                     ? "bg-gradient-to-r from-amber-500 to-yellow-600 text-white shadow-lg scale-105"
-                    : "bg-transparent text-gray-600 hover:bg-white/50"
+                    : dark ? "bg-transparent text-gray-400 hover:bg-slate-600/50" : "bg-transparent text-gray-600 hover:bg-white/50"
                 }`}
               >
                 CodeChef
@@ -136,7 +178,7 @@ const Leaderboard = ({ studentData }) => {
 
           {/* CodeChef Info Note */}
           {platform === "codechef" && (
-            <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-2xl p-4 flex items-start gap-3">
+            <div className={`mb-6 border rounded-2xl p-4 flex items-start gap-3 transition-colors duration-500 ${dark ? "bg-yellow-900/20 border-yellow-700/40" : "bg-yellow-50 border-yellow-200"}`}>
               <svg
                 className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5"
                 fill="currentColor"
@@ -148,7 +190,7 @@ const Leaderboard = ({ studentData }) => {
                   clipRule="evenodd"
                 />
               </svg>
-              <p className="text-sm text-yellow-800">
+              <p className={`text-sm ${dark ? "text-yellow-300" : "text-yellow-800"}`}>
                 <strong>Note:</strong> CodeChef rankings may be delayed due to platform restrictions. Private profiles will show "—" for problems solved.
               </p>
             </div>
@@ -157,10 +199,10 @@ const Leaderboard = ({ studentData }) => {
 
         {/* Loading State */}
         {loading && (
-          <div className="bg-white/70 backdrop-blur-2xl rounded-3xl shadow-2xl p-12 border border-white/30 text-center">
+          <div className={`backdrop-blur-2xl rounded-3xl shadow-2xl p-12 border text-center transition-colors duration-500 ${dark ? "bg-slate-800/70 border-slate-700/50" : "bg-white/70 border-white/30"}`}>
             <div className="flex flex-col items-center justify-center space-y-4">
-              <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
-              <p className="text-xl text-gray-600 font-medium">
+              <div className={`w-16 h-16 border-4 rounded-full animate-spin ${dark ? "border-indigo-800 border-t-indigo-400" : "border-indigo-200 border-t-indigo-600"}`}></div>
+              <p className={`text-xl font-medium ${dark ? "text-gray-400" : "text-gray-600"}`}>
                 Loading leaderboard...
               </p>
             </div>
@@ -169,7 +211,7 @@ const Leaderboard = ({ studentData }) => {
 
         {/* Error State */}
         {error && !loading && (
-          <div className="bg-red-50 border-2 border-red-200 rounded-3xl shadow-lg p-8">
+          <div className={`border-2 rounded-3xl shadow-lg p-8 ${dark ? "bg-red-900/20 border-red-800/40" : "bg-red-50 border-red-200"}`}>
             <div className="flex items-center space-x-4">
               <svg
                 className="w-8 h-8 text-red-600"
@@ -182,18 +224,18 @@ const Leaderboard = ({ studentData }) => {
                   clipRule="evenodd"
                 />
               </svg>
-              <p className="text-red-800 text-lg font-medium">{error}</p>
+              <p className={`text-lg font-medium ${dark ? "text-red-300" : "text-red-800"}`}>{error}</p>
             </div>
           </div>
         )}
 
         {/* Leaderboard Table */}
         {!loading && !error && (
-          <div className="bg-white/70 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/30 overflow-hidden">
+          <div className={`backdrop-blur-2xl rounded-3xl shadow-2xl border overflow-hidden transition-colors duration-500 ${dark ? "bg-slate-800/70 border-slate-700/50" : "bg-white/70 border-white/30"}`}>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white">
+                  <tr className={`text-white ${dark ? "bg-gradient-to-r from-slate-800 via-indigo-900 to-slate-800" : "bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900"}`}>
                     <th className="px-6 py-4 text-left font-bold">Rank</th>
                     <th className="px-6 py-4 text-left font-bold">Student Name</th>
                     <th className="px-6 py-4 text-left font-bold">College</th>
@@ -215,11 +257,15 @@ const Leaderboard = ({ studentData }) => {
                       return (
                         <tr
                           key={student._id}
-                          className={`border-b border-gray-100 transition-all duration-300 ${
+                          className={`border-b transition-all duration-300 ${
                             isCurrentUser
-                              ? "bg-gradient-to-r from-yellow-100 via-orange-50 to-yellow-50 hover:from-yellow-150 hover:to-orange-100"
-                              : "hover:bg-gray-50"
-                          } ${index % 2 === 0 ? "bg-gray-50/30" : ""}`}
+                              ? dark
+                                ? "bg-gradient-to-r from-yellow-900/30 via-orange-900/20 to-yellow-900/30 hover:from-yellow-900/40 border-yellow-800/30"
+                                : "bg-gradient-to-r from-yellow-100 via-orange-50 to-yellow-50 hover:from-yellow-150 hover:to-orange-100 border-gray-100"
+                              : dark
+                                ? `hover:bg-slate-700/50 border-slate-700/40 ${index % 2 === 0 ? "bg-slate-800/30" : ""}`
+                                : `hover:bg-gray-50 border-gray-100 ${index % 2 === 0 ? "bg-gray-50/30" : ""}`
+                          }`}
                         >
                           <td className="px-6 py-4">
                             <div className="flex items-center space-x-3">
@@ -239,7 +285,7 @@ const Leaderboard = ({ studentData }) => {
                                 </div>
                               )}
                               {student.rank > 3 && (
-                                <span className="text-lg font-bold text-gray-700 w-10 text-center">
+                                <span className={`text-lg font-bold w-10 text-center ${dark ? "text-gray-300" : "text-gray-700"}`}>
                                   {student.rank}
                                 </span>
                               )}
@@ -249,19 +295,19 @@ const Leaderboard = ({ studentData }) => {
                             <span
                               className={`font-semibold ${
                                 isCurrentUser
-                                  ? "text-orange-700"
-                                  : "text-gray-800"
+                                  ? "text-orange-500"
+                                  : dark ? "text-gray-200" : "text-gray-800"
                               }`}
                             >
                               {student.name}
                               {isCurrentUser && (
-                                <span className="ml-2 text-xs bg-orange-200 text-orange-800 px-3 py-1 rounded-full font-medium">
+                                <span className={`ml-2 text-xs px-3 py-1 rounded-full font-medium ${dark ? "bg-orange-900/40 text-orange-300" : "bg-orange-200 text-orange-800"}`}>
                                   You
                                 </span>
                               )}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-gray-600">
+                          <td className={`px-6 py-4 ${dark ? "text-gray-400" : "text-gray-600"}`}>
                             {student.college}
                           </td>
                           <td className="px-6 py-4 text-center">
@@ -352,11 +398,11 @@ const Leaderboard = ({ studentData }) => {
                               d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
                             />
                           </svg>
-                          <p className="text-gray-500 text-lg font-medium">
+                          <p className={`text-lg font-medium ${dark ? "text-gray-500" : "text-gray-500"}`}>
                             No students have submitted {platform === "leetcode" ? "LeetCode" : "CodeChef"} credentials yet
                           </p>
                           {studentData && (
-                            <p className="text-gray-400">
+                            <p className={`${dark ? "text-gray-600" : "text-gray-400"}`}>
                               Be the first to add your LeetCode username on your
                               dashboard!
                             </p>
@@ -371,20 +417,20 @@ const Leaderboard = ({ studentData }) => {
 
             {/* Leaderboard Stats */}
             {leaderboard.length > 0 && (
-              <div className="grid grid-cols-3 gap-4 bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50 p-6 border-t border-gray-100">
+              <div className={`grid grid-cols-3 gap-4 p-6 border-t transition-colors duration-500 ${dark ? "bg-slate-800/50 border-slate-700/40" : "bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50 border-gray-100"}`}>
                 <div className="text-center">
-                  <p className="text-gray-600 text-sm font-medium">
+                  <p className={`text-sm font-medium ${dark ? "text-gray-500" : "text-gray-600"}`}>
                     Total Students
                   </p>
-                  <p className="text-3xl font-bold text-indigo-600">
+                  <p className={`text-3xl font-bold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
                     {leaderboard.length}
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-gray-600 text-sm font-medium">
+                  <p className={`text-sm font-medium ${dark ? "text-gray-500" : "text-gray-600"}`}>
                     Average Problems
                   </p>
-                  <p className="text-3xl font-bold text-indigo-600">
+                  <p className={`text-3xl font-bold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
                     {platform === "leetcode" 
                       ? Math.round(
                           leaderboard.reduce((sum, s) => sum + (s.problemsSolved || 0), 0) /
@@ -398,10 +444,10 @@ const Leaderboard = ({ studentData }) => {
                   </p>
                 </div>
                 <div className="text-center">
-                  <p className="text-gray-600 text-sm font-medium">
+                  <p className={`text-sm font-medium ${dark ? "text-gray-500" : "text-gray-600"}`}>
                     Highest Score
                   </p>
-                  <p className="text-3xl font-bold text-indigo-600">
+                  <p className={`text-3xl font-bold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
                     {platform === "leetcode" 
                       ? (leaderboard[0]?.problemsSolved || 0)
                       : (leaderboard[0]?.codechefProblemsSolved || 0)
