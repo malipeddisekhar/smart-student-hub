@@ -88,7 +88,7 @@ const StudentLogin = ({ onLogin }) => {
   const handleMicrosoftLogin = () => {
     setIsLoading(true);
     // Redirect to backend Microsoft OAuth endpoint
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     window.location.href = `${backendUrl}/auth/microsoft`;
   };
 
