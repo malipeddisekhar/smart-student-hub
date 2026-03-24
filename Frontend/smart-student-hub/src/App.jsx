@@ -28,6 +28,8 @@ import AdminRegister from "./components/AdminRegister";
 import AdminDashboard from "./components/AdminDashboard";
 import StudentDetails from "./components/StudentDetails";
 import Leaderboard from "./components/Leaderboard";
+import SystemFeaturesPage from "./components/SystemFeaturesPage";
+import ContactPage from "./components/ContactPage";
 import api from "./services/api";
 
 // Page transition wrapper
@@ -59,6 +61,14 @@ const AnimatedRoutes = ({ studentData, teacherData, adminData, handleLogin, hand
         <Route
           path="/leaderboard"
           element={<PageTransition><Leaderboard studentData={studentData} /></PageTransition>}
+        />
+        <Route
+          path="/system-features"
+          element={<PageTransition><SystemFeaturesPage /></PageTransition>}
+        />
+        <Route
+          path="/contact"
+          element={<PageTransition><ContactPage /></PageTransition>}
         />
         <Route
           path="/login"
