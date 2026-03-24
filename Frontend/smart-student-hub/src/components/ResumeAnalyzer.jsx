@@ -51,6 +51,8 @@ export default function ResumeAnalyzer({ studentData }) {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
   const [hasApiKey, setHasApiKey] = useState(true);
+  const [uploadedResume, setUploadedResume] = useState(null);
+  const [resumePreview, setResumePreview] = useState(null);
 
   const studentId = studentData?.studentId || studentData?._id || localStorage.getItem('studentId');
 
@@ -59,7 +61,23 @@ export default function ResumeAnalyzer({ studentData }) {
     setLoading(true);
     setError('');
     try {
-      const res = await fetch(`${API_URL}/api/resume-analysis/${studentId}`);
+      let res;
+      
+      // If a resume is uploaded, send it to the special endpoint
+      if (uploadedResume) {
+        const formData = new FormData();
+        formData.append('resume', uploadedResume);
+        formData.append('studentId', studentId);
+        
+        res = await fetch(`${API_URL}/api/resume-analysis-upload`, {
+          method: 'POST',
+          body: formData
+        });
+      } else {
+        // Otherwise use the profile-based analysis
+        res = await fetch(`${API_URL}/api/resume-analysis/${studentId}`);
+      }
+      
       const data = await res.json();
       if (!res.ok) {
         if (data.error?.includes('API_KEY') || data.error?.includes('key')) {
@@ -77,6 +95,40 @@ export default function ResumeAnalyzer({ studentData }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResumeUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['application/pdf', 'image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError('Please upload a valid PDF or image file (PDF, PNG, JPG, JPEG, WebP)');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setError('File size must be less than 10MB');
+      return;
+    }
+
+    setUploadedResume(file);
+    setError('');
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setResumePreview(event.target?.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearResume = () => {
+    setUploadedResume(null);
+    setResumePreview(null);
   };
 
   const tabs = [
@@ -114,7 +166,7 @@ export default function ResumeAnalyzer({ studentData }) {
               Get personalized resume feedback, skill gap analysis, and <strong>real internship recommendations</strong> from top platforms — all powered by Google Gemini AI.
             </p>
             <p className="text-gray-400 text-sm mb-8">
-              Analyzes your profile, projects, certificates, coding stats &amp; more.
+              Analyzes your profile, projects, certificates, coding stats &amp; more. Or upload your own resume.
             </p>
 
             {error && (
@@ -129,10 +181,55 @@ export default function ResumeAnalyzer({ studentData }) {
               </div>
             )}
 
-            <button onClick={runAnalysis}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-10 py-4 rounded-xl text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all duration-200">
-              🚀 Analyze My Resume
-            </button>
+            {/* Resume Upload Section */}
+            <div className="max-w-2xl mx-auto mb-8 p-6 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-dashed border-indigo-300">
+              <label className="cursor-pointer block">
+                <input
+                  type="file"
+                  accept=".pdf,image/*"
+                  onChange={handleResumeUpload}
+                  className="hidden"
+                  disabled={loading}
+                />
+                <div className="flex flex-col items-center gap-3">
+                  <div className="text-4xl">📄</div>
+                  <div>
+                    <p className="font-semibold text-gray-700">Upload Your Resume</p>
+                    <p className="text-xs text-gray-500 mt-1">PDF or Image (PNG, JPG) • Max 10MB</p>
+                  </div>
+                  <span className="text-sm text-indigo-600 font-medium hover:text-indigo-700 transition-colors">
+                    Click to browse
+                  </span>
+                </div>
+              </label>
+
+              {uploadedResume && (
+                <div className="mt-4 pt-4 border-t border-indigo-200">
+                  <p className="text-sm text-gray-600 mb-3">📎 Uploaded: <span className="font-medium">{uploadedResume.name}</span></p>
+                  {resumePreview && uploadedResume.type.startsWith('image') && (
+                    <div className="mb-3 max-h-48 overflow-auto">
+                      <img src={resumePreview} alt="Resume preview" className="max-w-full h-auto rounded-lg border border-indigo-200" />
+                    </div>
+                  )}
+                  {uploadedResume.type === 'application/pdf' && (
+                    <p className="text-xs text-gray-500 mb-3">PDF file ready for analysis</p>
+                  )}
+                  <button
+                    onClick={clearResume}
+                    className="text-xs text-red-600 hover:text-red-700 font-medium transition-colors"
+                  >
+                    ✕ Clear
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button onClick={runAnalysis}
+                className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-10 py-4 rounded-xl text-lg font-semibold hover:shadow-xl hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2">
+                🚀 Analyze {uploadedResume ? 'Uploaded Resume' : 'My Resume'}
+              </button>
+            </div>
           </div>
         )}
 

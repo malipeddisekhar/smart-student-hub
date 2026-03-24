@@ -17,7 +17,7 @@ const Message = require("./models/Message");
 const { OAuth2Client } = require('google-auth-library');
 const { fetchLeetCodeStats } = require("./utils/leetcodeService");
 const { fetchCodeChefStats } = require("./utils/codechefService");
-const { buildStudentProfile, analyzeResumeWithAI } = require("./utils/resumeAnalyzerAI");
+const { buildStudentProfile, analyzeResumeWithAI, extractTextFromPDF, extractTextFromImage, buildProfileFromResumeText } = require("./utils/resumeAnalyzerAI");
 const Notification = require("./models/Notification");
 const http = require('http');
 const { Server } = require('socket.io');
@@ -1405,6 +1405,68 @@ app.get('/api/resume-analysis/:studentId', async (req, res) => {
   } catch (error) {
     console.error('Resume analysis error:', error.message);
     res.status(500).json({ error: error.message || 'Failed to analyze resume' });
+  }
+});
+
+// Handle uploaded resume files (PDF or images)
+app.post('/api/resume-analysis-upload', upload.single('resume'), async (req, res) => {
+  try {
+    const { studentId } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ error: 'No resume file uploaded' });
+    }
+
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    let resumeText = '';
+    const fileType = req.file.mimetype;
+    const fileUrl = req.file.path || req.file.secure_url || req.file.url;
+
+    console.log(`[Resume Upload] File type: ${fileType}, URL: ${fileUrl}`);
+
+    // Extract text based on file type
+    if (fileType === 'application/pdf') {
+      console.log('[Resume Upload] Extracting text from PDF...');
+      try {
+        resumeText = await extractTextFromPDF(fileUrl);
+      } catch (pdfError) {
+        console.warn(`[Resume Upload] PDF extraction failed: ${pdfError.message}, attempting fallback...`);
+        // Fallback: try alternative PDF extraction
+        resumeText = 'Unable to extract text from PDF. Please ensure the PDF contains selectable text (not scanned images).';
+      }
+    } else if (fileType.startsWith('image/')) {
+      console.log('[Resume Upload] Extracting text from image using OCR...');
+      try {
+        resumeText = await extractTextFromImage(fileUrl);
+      } catch (ocrError) {
+        console.warn(`[Resume Upload] OCR extraction failed: ${ocrError.message}`);
+        resumeText = 'Unable to extract text from image. Please ensure the image is clear and readable.';
+      }
+    } else {
+      return res.status(400).json({ error: 'Unsupported file type. Please upload a PDF or image.' });
+    }
+
+    if (!resumeText || resumeText.trim().length < 10) {
+      return res.status(400).json({ 
+        error: 'Could not extract text from the uploaded resume. Please check the file quality and ensure it contains readable text.',
+        suggestion: fileType === 'application/pdf' ? 'If it\'s a scanned PDF, try converting it to an image for better OCR results.' : 'Try uploading a clearer image or PDF'
+      });
+    }
+
+    console.log(`[Resume Upload] Extracted ${resumeText.length} characters from resume`);
+
+    // Build profile from extracted resume text
+    const studentProfile = buildProfileFromResumeText(resumeText, student);
+
+    // Analyze with AI
+    const analysis = await analyzeResumeWithAI(studentProfile);
+
+    res.json({ success: true, analysis, profile: studentProfile });
+  } catch (error) {
+    console.error('[Resume Upload] Error:', error.message);
+    res.status(500).json({ error: error.message || 'Failed to analyze uploaded resume' });
   }
 });
 

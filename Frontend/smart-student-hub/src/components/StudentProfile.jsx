@@ -87,6 +87,13 @@ const StudentProfile = ({ studentData }) => {
     }
   };
 
+  const handleDeleteCertificate = (certName) => {
+    if (window.confirm('Are you sure you want to delete this certificate?')) {
+      setProfile({ ...profile, [certName]: null });
+      setFormData({ ...formData, [certName]: null });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <nav className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-2xl border-b border-white/10">
@@ -267,13 +274,26 @@ const StudentProfile = ({ studentData }) => {
                 </svg>
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => document.getElementById(cert.name).click()}
-              className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
-            >
-              Replace Certificate
-            </button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => document.getElementById(cert.name).click()}
+                className="flex-1 bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
+              >
+                Replace Certificate
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDeleteCertificate(cert.name)}
+                className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white py-3 px-4 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg flex items-center space-x-1"
+                title="Delete this certificate"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd"/>
+                </svg>
+                <span>Delete</span>
+              </button>
+            </div>
             <input
               id={cert.name}
               type="file"
