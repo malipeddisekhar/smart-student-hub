@@ -826,8 +826,8 @@ const Dashboard = ({ studentData, onLogout }) => {
             </div>
           </motion.div>
 
-          <LeetCodeCard studentData={studentData} />
-          <CodeChefCard studentData={studentData} />
+          <LeetCodeCard studentData={studentData} dark={dark} />
+          <CodeChefCard studentData={studentData} dark={dark} />
 
         </div>
       </div>
