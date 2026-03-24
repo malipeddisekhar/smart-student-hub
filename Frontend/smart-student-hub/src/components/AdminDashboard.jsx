@@ -1,26 +1,104 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import api from '../services/api';
 
-const AdminDashboard = ({ adminData, onLogout }) => {
+const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
   const navigate = useNavigate();
   const [students, setStudents] = useState([]);
+  const [totalStudents, setTotalStudents] = useState(0);
   const [teachers, setTeachers] = useState([]);
+  const [totalTeachers, setTotalTeachers] = useState(0);
+  const [allStudents, setAllStudents] = useState([]);
+  const [allTeachers, setAllTeachers] = useState([]);
+  const [studentSearch, setStudentSearch] = useState('');
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [groupSearch, setGroupSearch] = useState('');
+  const [groupStudentSearch, setGroupStudentSearch] = useState('');
+  const [editGroupStudentSearch, setEditGroupStudentSearch] = useState('');
   const [colleges, setColleges] = useState([]);
   const [groups, setGroups] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [groupForm, setGroupForm] = useState({ name: '', teacher: '', students: [] });
   const [editingGroup, setEditingGroup] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', teacher: '', students: [] });
+  const [showAdminEditModal, setShowAdminEditModal] = useState(false);
+  const [savingAdminProfile, setSavingAdminProfile] = useState(false);
+  const [showAllStudents, setShowAllStudents] = useState(true);
+  const [selectedStudentBranch, setSelectedStudentBranch] = useState('ALL');
+  const [selectedStudentGroup, setSelectedStudentGroup] = useState('ALL');
+  const [lastGroupCreated, setLastGroupCreated] = useState(null);
+  const [teacherDetailsForStudents, setTeacherDetailsForStudents] = useState(null);
+  const [showTeacherStudentModal, setShowTeacherStudentModal] = useState(false);
+  const [adminProfileForm, setAdminProfileForm] = useState({
+    name: '',
+    email: '',
+    institution: '',
+    department: '',
+    role: 'Super Admin',
+  });
   const [dark, setDark] = useState(() => {
     try { return JSON.parse(localStorage.getItem('admin-dark-mode')) ?? true; } catch { return true; }
   });
   useEffect(() => { localStorage.setItem('admin-dark-mode', JSON.stringify(dark)); }, [dark]);
 
   useEffect(() => {
+    if (!lastGroupCreated) return;
+    const timer = setTimeout(() => setLastGroupCreated(null), 4000);
+    return () => clearTimeout(timer);
+  }, [lastGroupCreated]);
+
+  useEffect(() => {
     fetchData();
-  }, []);
+  }, [adminData?.adminId, adminData?.institution, adminData?.department]);
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      fetchData();
+    }, 10000);
+
+    const onFocus = () => fetchData();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [adminData?.adminId, adminData?.institution, adminData?.department]);
+
+  const normalize = (value) => String(value || '').trim().toLowerCase();
+
+  const getBranchCode = (department) => {
+    const d = normalize(department);
+    if (d.includes('aiml') || d.includes('ai ml') || d.includes('artificial intelligence')) return 'AIML';
+    if (d.includes('aids') || d.includes('ai ds') || d.includes('data science')) return 'AIDS';
+    if (d.includes('cse') || d.includes('computer science')) return 'CSE';
+    if (d.includes('mech') || d.includes('mec') || d.includes('mechanical')) return 'MECH';
+    if (d.includes('eee') || d.includes('electrical')) return 'EEE';
+    if (d.includes('ece') || d.includes('electronics')) return 'ECE';
+    if (d === 'it' || d.includes('information technology')) return 'IT';
+    return 'OTHER';
+  };
+
+  useEffect(() => {
+    setAdminProfileForm({
+      name: adminData?.name || '',
+      email: adminData?.email || '',
+      institution: adminData?.institution || '',
+      department: adminData?.department || '',
+      role: adminData?.role || 'Super Admin',
+    });
+  }, [adminData]);
+
+  const getApiErrorMessage = (error, fallback) => {
+    const status = error?.response?.status;
+    const payload = error?.response?.data || {};
+    const details = Array.isArray(payload?.details) ? payload.details.filter(Boolean) : [];
+    const main = payload?.error || payload?.message || error?.message || fallback;
+    if (details.length > 0) {
+      return `${main} (HTTP ${status || 'N/A'})\n- ${details.join('\n- ')}`;
+    }
+    return `${main}${status ? ` (HTTP ${status})` : ''}`;
+  };
 
   const fetchData = async () => {
     try {
@@ -29,30 +107,227 @@ const AdminDashboard = ({ adminData, onLogout }) => {
         api.get('/api/admin/teachers'),
         api.get('/api/colleges')
       ]);
-      console.log('Admin data:', adminData);
-      console.log('All students:', studentsRes.data);
-      console.log('All teachers:', teachersRes.data);
-      
-      const filteredStudents = studentsRes.data.filter(student => {
-        console.log('Student:', student.name, 'College:', student.college, 'Dept:', student.department);
-        return student.college === adminData.institution && student.department === adminData.department;
-      });
-      const filteredTeachers = teachersRes.data.filter(teacher => {
-        console.log('Teacher:', teacher.name, 'College:', teacher.college, 'Dept:', teacher.department);
-        return teacher.college === adminData.institution && teacher.department === adminData.department;
-      });
-      
-      console.log('Filtered students:', filteredStudents);
-      console.log('Filtered teachers:', filteredTeachers);
-      
-      setStudents(studentsRes.data);
-      setTeachers(teachersRes.data);
+
+      const allStudents = Array.isArray(studentsRes.data) ? studentsRes.data : [];
+      const allTeachers = Array.isArray(teachersRes.data) ? teachersRes.data : [];
+
+      setAllStudents(allStudents);
+      setAllTeachers(allTeachers);
+
+      setTotalStudents(allStudents.length);
+      setTotalTeachers(allTeachers.length);
+
+      const hasAdminScope = Boolean(adminData?.institution && adminData?.department);
+
+      const filteredStudents = hasAdminScope
+        ? allStudents.filter(
+            (student) =>
+              normalize(student.college) === normalize(adminData.institution) &&
+              normalize(student.department) === normalize(adminData.department)
+          )
+        : allStudents;
+
+      const filteredTeachers = hasAdminScope
+        ? allTeachers.filter(
+            (teacher) =>
+              normalize(teacher.college) === normalize(adminData.institution) &&
+              normalize(teacher.department) === normalize(adminData.department)
+          )
+        : allTeachers;
+
+      // If admin scope labels don't match dataset labels, show all data instead of blank tables.
+      setStudents(hasAdminScope && filteredStudents.length === 0 ? allStudents : filteredStudents);
+      setTeachers(hasAdminScope && filteredTeachers.length === 0 ? allTeachers : filteredTeachers);
       setColleges(collegesRes.data);
       
       const groupsRes = await api.get(`/api/groups/${adminData.adminId}`);
-      setGroups(groupsRes.data);
+      setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
     } catch (error) {
       console.error('Error fetching data:', error);
+    }
+  };
+
+  const handleEditStudent = async (student) => {
+    const updatedName = window.prompt('Student name', student.name || '');
+    if (updatedName === null) return;
+
+    const updatedEmail = window.prompt('Student email', student.email || '');
+    if (updatedEmail === null) return;
+
+    const updatedDepartment = window.prompt('Student department', student.department || '');
+    if (updatedDepartment === null) return;
+
+    const updatedCollege = window.prompt('Student college', student.college || '');
+    if (updatedCollege === null) return;
+
+    try {
+      await api.put(`/api/admin/students/${student.studentId}`, {
+        name: updatedName,
+        email: updatedEmail,
+        department: updatedDepartment,
+        college: updatedCollege,
+      });
+      await fetchData();
+    } catch (error) {
+      alert(getApiErrorMessage(error, 'Failed to update student'));
+    }
+  };
+
+  const handleDeleteStudent = async (student) => {
+    const confirmed = window.confirm(`Delete student ${student.name} (${student.studentId})?`);
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/admin/students/${student.studentId}`);
+      await fetchData();
+    } catch (error) {
+      alert(getApiErrorMessage(error, 'Failed to delete student'));
+    }
+  };
+
+  const handleEditTeacher = async (teacher) => {
+    const updatedName = window.prompt('Faculty name', teacher.name || '');
+    if (updatedName === null) return;
+
+    const updatedEmail = window.prompt('Faculty email', teacher.email || '');
+    if (updatedEmail === null) return;
+
+    const updatedDepartment = window.prompt('Faculty department', teacher.department || '');
+    if (updatedDepartment === null) return;
+
+    const updatedDesignation = window.prompt('Faculty designation', teacher.designation || '');
+    if (updatedDesignation === null) return;
+
+    try {
+      await api.put(`/api/admin/teachers/${teacher.teacherId}`, {
+        name: updatedName,
+        email: updatedEmail,
+        department: updatedDepartment,
+        designation: updatedDesignation,
+      });
+      await fetchData();
+    } catch (error) {
+      alert(getApiErrorMessage(error, 'Failed to update faculty'));
+    }
+  };
+
+  const handleDeleteTeacher = async (teacher) => {
+    const confirmed = window.confirm(`Delete faculty ${teacher.name} (${teacher.teacherId})?`);
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/api/admin/teachers/${teacher.teacherId}`);
+      await fetchData();
+    } catch (error) {
+      alert(getApiErrorMessage(error, 'Failed to delete faculty'));
+    }
+  };
+
+  const studentQuery = normalize(studentSearch);
+  const teacherQuery = normalize(teacherSearch);
+  const groupQuery = normalize(groupSearch);
+
+  const studentSource = showAllStudents ? allStudents : students;
+
+  const isStudentInSelectedGroup = (studentId) => {
+    if (selectedStudentGroup === 'ALL') return true;
+    const selectedGroupObject = groups.find((g) => g._id === selectedStudentGroup);
+    if (!selectedGroupObject) return true;
+    return Array.isArray(selectedGroupObject.students) && selectedGroupObject.students.includes(studentId);
+  };
+
+  const visibleStudents = studentSource.filter((student) => {
+    const matchesSearch = !studentQuery || [
+      student.studentId,
+      student.name,
+      student.email,
+      student.department,
+      student.college,
+    ].some((value) => normalize(value).includes(studentQuery));
+
+    const matchesBranch =
+      selectedStudentBranch === 'ALL' || getBranchCode(student.department) === selectedStudentBranch;
+
+    const matchesGroup = isStudentInSelectedGroup(student.studentId);
+
+    return matchesSearch && matchesBranch && matchesGroup;
+  });
+
+  const visibleTeachers = teachers.filter((teacher) => {
+    if (!teacherQuery) return true;
+    return [
+      teacher.teacherId,
+      teacher.name,
+      teacher.email,
+      teacher.department,
+      teacher.designation,
+      teacher.college,
+    ].some((value) => normalize(value).includes(teacherQuery));
+  });
+
+  const visibleGroups = groups.filter((group) => {
+    if (!groupQuery) return true;
+    return [
+      group.name,
+      group.teacher,
+      group.college,
+      group.department,
+    ].some((value) => normalize(value).includes(groupQuery));
+  });
+
+  const groupStudentQuery = normalize(groupStudentSearch);
+  const visibleGroupStudents = allStudents.filter((student) => {
+    if (!groupStudentQuery) return true;
+    return [student.studentId, student.name, student.email, student.department].some((value) =>
+      normalize(value).includes(groupStudentQuery)
+    );
+  });
+
+  const editGroupStudentQuery = normalize(editGroupStudentSearch);
+  const visibleEditGroupStudents = allStudents.filter((student) => {
+    if (!editGroupStudentQuery) return true;
+    return [student.studentId, student.name, student.email, student.department].some((value) =>
+      normalize(value).includes(editGroupStudentQuery)
+    );
+  });
+
+  const getTeacherDisplayName = (teacherId) => {
+    const teacher = teachers.find((t) => t.teacherId === teacherId);
+    if (!teacher) return teacherId;
+    const teacherBranch = teacher.department || 'No Branch';
+    return `${teacher.name} (${teacherBranch})`;
+  };
+
+  const getTeacherGroupCount = (teacherId) => {
+    return groups.filter((group) => group.teacher === teacherId).length;
+  };
+
+  const getStudentGroupCount = (studentId) => {
+    return groups.filter((group) => group.students?.includes(studentId)).length;
+  };
+
+  const getStudentsForTeacher = (teacherId) => {
+    const assignedGroups = groups.filter((group) => group.teacher === teacherId);
+    const studentIds = new Set(assignedGroups.flatMap((group) => group.students || []));
+    return allStudents.filter((student) => studentIds.has(student.studentId));
+  };
+
+  const handleSaveAdminProfile = async (e) => {
+    e.preventDefault();
+    if (!adminData?.adminId) return;
+
+    try {
+      setSavingAdminProfile(true);
+      const response = await api.put(`/api/admin/profile/${adminData.adminId}`, adminProfileForm);
+      if (typeof onAdminUpdate === 'function') {
+        onAdminUpdate(response.data);
+      }
+      setShowAdminEditModal(false);
+      await fetchData();
+    } catch (error) {
+      alert(getApiErrorMessage(error, 'Failed to update admin profile'));
+    } finally {
+      setSavingAdminProfile(false);
     }
   };
 
@@ -60,6 +335,18 @@ const AdminDashboard = ({ adminData, onLogout }) => {
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${dark ? 'bg-gradient-to-br from-gray-950 via-slate-900 to-gray-900' : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100'}`}>
+      {lastGroupCreated && (
+        <div className="fixed top-6 right-6 z-50 w-80">
+          <div className={`rounded-xl p-4 shadow-lg border ${dark ? 'bg-slate-800 text-white border-white/10' : 'bg-white text-gray-900 border-gray-200'}`}>
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-semibold">Group Created</span>
+              <button onClick={() => setLastGroupCreated(null)} className="text-gray-500 hover:text-gray-700">x</button>
+            </div>
+            <p className="text-sm">{lastGroupCreated.name} has been created successfully.</p>
+            <p className="text-xs text-gray-500 mt-1">{new Date(lastGroupCreated.createdAt || Date.now()).toLocaleString()}</p>
+          </div>
+        </div>
+      )}
       {/* Modern Navigation */}
       <nav className={`backdrop-blur-xl border-b shadow-lg sticky top-0 z-40 transition-colors duration-300 ${dark ? 'bg-slate-900/80 border-white/10' : 'bg-white/80 border-white/20'}`}>
         <div className="max-w-7xl mx-auto px-6 py-4">
@@ -78,12 +365,19 @@ const AdminDashboard = ({ adminData, onLogout }) => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className={`hidden md:flex items-center space-x-2 px-4 py-2 rounded-xl ${dark ? 'bg-white/10' : 'bg-gradient-to-r from-indigo-50 to-purple-50'}`}>
+              <button
+                onClick={() => setShowAdminEditModal(true)}
+                className={`hidden md:flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${dark ? 'bg-white/10 hover:bg-white/20' : 'bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100'}`}
+                title="Edit admin profile"
+              >
                 <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center">
                   <span className="text-white text-sm font-bold">{adminData?.name?.charAt(0)}</span>
                 </div>
                 <span className={`text-sm font-medium ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Welcome, {adminData?.name}</span>
-              </div>
+                <svg className={`w-4 h-4 ${dark ? 'text-gray-300' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M17.414 2.586a2 2 0 010 2.828l-8.5 8.5A1 1 0 018.5 14H5a1 1 0 01-1-1v-3.5a1 1 0 01.293-.707l8.5-8.5a2 2 0 012.828 0z"/>
+                </svg>
+              </button>
               {/* Dark mode toggle */}
               <button
                 onClick={() => setDark(d => !d)}
@@ -113,11 +407,11 @@ const AdminDashboard = ({ adminData, onLogout }) => {
       <div className="max-w-7xl mx-auto p-6">
         {/* Modern Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
+          <div className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Total Students</p>
-                <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{students.length}</p>
+                <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{totalStudents}</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -125,13 +419,13 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                 </svg>
               </div>
             </div>
-          </motion.div>
+          </div>
           
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }} className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
+          <div className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Total Teachers</p>
-                <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">{teachers.length}</p>
+                <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">{totalTeachers}</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
                 <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -139,9 +433,9 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                 </svg>
               </div>
             </div>
-          </motion.div>
+          </div>
           
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }} className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
+          <div className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Active Groups</p>
@@ -153,9 +447,9 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                 </svg>
               </div>
             </div>
-          </motion.div>
+          </div>
           
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.4 }} className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
+          <div className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className={`text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>System Status</p>
@@ -167,11 +461,11 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                 </svg>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Modern Tab Navigation */}
-        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.5 }} className={`backdrop-blur-xl rounded-2xl shadow-xl border overflow-hidden transition-colors duration-300 ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
+        <div className={`backdrop-blur-xl rounded-2xl shadow-xl border overflow-hidden ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
           <div className={`border-b ${dark ? 'border-white/10' : 'border-gray-200/50'}`}>
             <nav className="flex space-x-8 px-6">
               {[
@@ -193,6 +487,21 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                     <path fillRule="evenodd" d={tab.icon} clipRule="evenodd"/>
                   </svg>
                   <span>{tab.label}</span>
+                  {tab.key === 'students' && (
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${dark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
+                      {totalStudents}
+                    </span>
+                  )}
+                  {tab.key === 'teachers' && (
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${dark ? 'bg-green-500/20 text-green-300' : 'bg-green-100 text-green-700'}`}>
+                      {totalTeachers}
+                    </span>
+                  )}
+                  {tab.key === 'groups' && (
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${dark ? 'bg-purple-500/20 text-purple-300' : 'bg-purple-100 text-purple-700'}`}>
+                      {groups.length}
+                    </span>
+                  )}
                 </button>
               ))}
             </nav>
@@ -209,6 +518,12 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                     Admin Profile
                   </h3>
                   <p className={`${dark ? 'text-gray-400' : 'text-gray-600'}`}>Manage your administrative account</p>
+                  <button
+                    onClick={() => setShowAdminEditModal(true)}
+                    className="mt-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white px-5 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg"
+                  >
+                    Edit Profile
+                  </button>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -269,19 +584,59 @@ const AdminDashboard = ({ adminData, onLogout }) => {
 
           {activeTab === 'students' && (
             <div className="p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Student Management</h3>
-                  <p className={`mt-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Manage and view all registered students</p>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">Student Management</h3>
+                    <p className={`mt-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Manage and view all registered students</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 justify-start md:justify-end">
+                    <div className={`px-4 py-2 rounded-xl ${dark ? 'bg-blue-500/10' : 'bg-gradient-to-r from-blue-50 to-cyan-50'}`}>
+                      <span className={`text-sm font-medium ${dark ? 'text-blue-400' : 'text-blue-700'}`}>
+                        {visibleStudents.length} / {showAllStudents ? allStudents.length : students.length} Students
+                      </span>
+                    </div>
+                    <select
+                      value={selectedStudentBranch}
+                      onChange={(e) => setSelectedStudentBranch(e.target.value)}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${dark ? 'bg-white/10 border border-white/10 text-gray-200' : 'bg-white border border-gray-200 text-gray-700'} focus:outline-none focus:ring-2 focus:ring-blue-500/30`}
+                    >
+                      <option value="ALL">All Branches</option>
+                      <option value="AIML">AIML</option>
+                      <option value="AIDS">AIDS</option>
+                      <option value="CSE">CSE</option>
+                      <option value="MECH">MEC/MECH</option>
+                      <option value="EEE">EEE</option>
+                      <option value="ECE">ECE</option>
+                      <option value="IT">IT</option>
+                    </select>
+                    <select
+                      value={selectedStudentGroup}
+                      onChange={(e) => setSelectedStudentGroup(e.target.value)}
+                      className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${dark ? 'bg-white/10 border border-white/10 text-gray-200' : 'bg-white border border-gray-200 text-gray-700'} focus:outline-none focus:ring-2 focus:ring-blue-500/30`}
+                    >
+                      <option value="ALL">All Groups</option>
+                      {groups.map((group) => (
+                        <option key={group._id} value={group._id}>{group.name} ({group.students?.length || 0} students)</option>
+                      ))}
+                    </select>
+                    <div className="relative w-full sm:w-64">
+                      <input
+                        type="text"
+                        value={studentSearch}
+                        onChange={(e) => setStudentSearch(e.target.value)}
+                        placeholder="Search students..."
+                        className={`w-full px-4 py-2.5 pl-10 rounded-xl border transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-blue-400/50' : 'bg-white/80 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-500'} focus:outline-none focus:ring-2 focus:ring-blue-500/30`}
+                      />
+                      <svg className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                      </svg>
+                    </div>
+                  </div>
                 </div>
-                <div className={`px-4 py-2 rounded-xl ${dark ? 'bg-blue-500/10' : 'bg-gradient-to-r from-blue-50 to-cyan-50'}`}>
-                  <span className={`text-sm font-medium ${dark ? 'text-blue-400' : 'text-blue-700'}`}>{students.length} Total Students</span>
-                </div>
-              </div>
               
               <div className={`backdrop-blur-sm rounded-2xl shadow-xl border overflow-hidden ${dark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white/20'}`}>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full table-fixed">
                     <thead className={`${dark ? 'bg-white/5' : 'bg-gradient-to-r from-gray-50 to-gray-100'}`}>
                       <tr>
                         <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Student ID</th>
@@ -289,10 +644,12 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                         <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Email</th>
                         <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Department</th>
                         <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>College</th>
+                        <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Group Count</th>
+                        <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Actions</th>
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${dark ? 'divide-white/10' : 'divide-gray-200'}`}>
-                      {students.map((student, index) => (
+                      {visibleStudents.map((student, index) => (
                         <tr key={student._id} className={`transition-colors duration-200 ${dark ? (index % 2 === 0 ? 'bg-white/[0.02]' : 'bg-transparent') + ' hover:bg-white/5' : (index % 2 === 0 ? 'bg-white/50' : 'bg-gray-50/30') + ' hover:bg-blue-50/50'}`}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
@@ -302,16 +659,40 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                               <span className={`text-sm font-medium ${dark ? 'text-gray-200' : 'text-gray-900'}`}>{student.studentId}</span>
                             </div>
                           </td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${dark ? 'text-gray-200' : 'text-gray-900'}`}>{student.name}</td>
-                          <td className={`px-6 py-4 whitespace-nowrap text-sm ${dark ? 'text-gray-400' : 'text-gray-600'}`}>{student.email}</td>
+                          <td title={student.name} className={`px-6 py-4 whitespace-nowrap text-sm font-medium truncate max-w-[220px] ${dark ? 'text-gray-200' : 'text-gray-900'}`}>{student.name}</td>
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm truncate max-w-[240px] ${dark ? 'text-gray-400' : 'text-gray-600'}`}>{student.email}</td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${dark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-800'}`}>
                               {student.department}
                             </span>
                           </td>
                           <td className={`px-6 py-4 whitespace-nowrap text-sm ${dark ? 'text-gray-400' : 'text-gray-600'}`}>{student.college}</td>
+                          <td className={`px-6 py-4 whitespace-nowrap ${dark ? 'text-gray-200' : 'text-gray-800'}`}>{getStudentGroupCount(student.studentId)}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2 min-w-[150px]">
+                              <button
+                                onClick={() => handleEditStudent(student)}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all duration-200"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteStudent(student)}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600 transition-all duration-200"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
+                      {visibleStudents.length === 0 && (
+                        <tr>
+                          <td colSpan="7" className={`px-6 py-8 text-center text-sm ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            No students found for this search.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -321,19 +702,33 @@ const AdminDashboard = ({ adminData, onLogout }) => {
 
           {activeTab === 'teachers' && (
             <div className="p-8">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
                 <div>
                   <h3 className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">Faculty Management</h3>
                   <p className={`mt-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Manage and view all faculty members</p>
                 </div>
-                <div className={`px-4 py-2 rounded-xl ${dark ? 'bg-green-500/10' : 'bg-gradient-to-r from-green-50 to-emerald-50'}`}>
-                  <span className={`text-sm font-medium ${dark ? 'text-green-400' : 'text-green-700'}`}>{teachers.length} Total Faculty</span>
+                <div className="flex items-center gap-3">
+                  <div className={`px-4 py-2 rounded-xl ${dark ? 'bg-green-500/10' : 'bg-gradient-to-r from-green-50 to-emerald-50'}`}>
+                    <span className={`text-sm font-medium ${dark ? 'text-green-400' : 'text-green-700'}`}>{visibleTeachers.length} / {totalTeachers} Faculty</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={teacherSearch}
+                      onChange={(e) => setTeacherSearch(e.target.value)}
+                      placeholder="Search faculty..."
+                      className={`w-64 px-4 py-2.5 pl-10 rounded-xl border transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-green-400/50' : 'bg-white/80 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-green-500'} focus:outline-none focus:ring-2 focus:ring-green-500/30`}
+                    />
+                    <svg className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                    </svg>
+                  </div>
                 </div>
               </div>
               
               <div className={`backdrop-blur-sm rounded-2xl shadow-xl border overflow-hidden ${dark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white/20'}`}>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
+                  <table className="w-full min-w-[1100px]">
                     <thead className={`${dark ? 'bg-white/5' : 'bg-gradient-to-r from-gray-50 to-gray-100'}`}>
                       <tr>
                         <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Teacher ID</th>
@@ -341,10 +736,12 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                         <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Email</th>
                         <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Department</th>
                         <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Designation</th>
+                        <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Group Count</th>
+                        <th className={`px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Actions</th>
                       </tr>
                     </thead>
                     <tbody className={`divide-y ${dark ? 'divide-white/10' : 'divide-gray-200'}`}>
-                      {teachers.map((teacher, index) => (
+                      {visibleTeachers.map((teacher, index) => (
                         <tr key={teacher._id} className={`transition-colors duration-200 ${dark ? (index % 2 === 0 ? 'bg-white/[0.02]' : 'bg-transparent') + ' hover:bg-white/5' : (index % 2 === 0 ? 'bg-white/50' : 'bg-gray-50/30') + ' hover:bg-green-50/50'}`}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
@@ -366,8 +763,46 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                               {teacher.designation}
                             </span>
                           </td>
+                          <td className={`px-6 py-4 whitespace-nowrap ${dark ? 'text-gray-200' : 'text-gray-800'}`}>
+                            {getTeacherGroupCount(teacher.teacherId)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2 min-w-[200px]">
+                              <button
+                                onClick={() => {
+                                  setTeacherDetailsForStudents({
+                                    teacher,
+                                    students: getStudentsForTeacher(teacher.teacherId)
+                                  });
+                                  setShowTeacherStudentModal(true);
+                                }}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-blue-500 to-indigo-500 text-white hover:from-blue-600 hover:to-indigo-600 transition-all duration-200"
+                              >
+                                Assigned Students
+                              </button>
+                              <button
+                                onClick={() => handleEditTeacher(teacher)}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all duration-200"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTeacher(teacher)}
+                                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-red-500 to-pink-500 text-white hover:from-red-600 hover:to-pink-600 transition-all duration-200"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
+                      {visibleTeachers.length === 0 && (
+                        <tr>
+                          <td colSpan="7" className={`px-6 py-8 text-center text-sm ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            No faculty found for this search.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -375,11 +810,56 @@ const AdminDashboard = ({ adminData, onLogout }) => {
             </div>
           )}
 
+          {showTeacherStudentModal && teacherDetailsForStudents && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
+              <div className={`w-full max-w-lg rounded-2xl p-5 shadow-2xl ${dark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-lg font-bold">{teacherDetailsForStudents.teacher.name} - Assigned Students</h4>
+                  <button onClick={() => setShowTeacherStudentModal(false)} className="text-gray-400 hover:text-gray-600">x</button>
+                </div>
+                {teacherDetailsForStudents.students.length === 0 ? (
+                  <p className="text-sm text-gray-400">No students assigned to this teacher yet.</p>
+                ) : (
+                  <div className="max-h-72 overflow-y-auto space-y-2">
+                    {teacherDetailsForStudents.students.map((student) => (
+                      <div key={student.studentId} className={`rounded-lg border p-3 ${dark ? 'border-white/10' : 'border-gray-200'}`}>
+                        <p className="font-medium">{student.name} ({student.studentId})</p>
+                        <p className="text-xs text-gray-500">{student.department} - {student.college}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="mt-4 text-right">
+                  <button onClick={() => setShowTeacherStudentModal(false)} className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:bg-blue-700">Close</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'groups' && (
             <div className="p-8">
-              <div className="mb-6">
-                <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Group Management</h3>
-                <p className={`mt-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Create and manage student groups</p>
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">Group Management</h3>
+                  <p className={`mt-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Create and manage student groups</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className={`px-4 py-2 rounded-xl ${dark ? 'bg-purple-500/10' : 'bg-gradient-to-r from-purple-50 to-pink-50'}`}>
+                    <span className={`text-sm font-medium ${dark ? 'text-purple-400' : 'text-purple-700'}`}>{visibleGroups.length} / {groups.length} Groups</span>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={groupSearch}
+                      onChange={(e) => setGroupSearch(e.target.value)}
+                      placeholder="Search groups..."
+                      className={`w-64 px-4 py-2.5 pl-10 rounded-xl border transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-purple-400/50' : 'bg-white/80 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-purple-500'} focus:outline-none focus:ring-2 focus:ring-purple-500/30`}
+                    />
+                    <svg className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                    </svg>
+                  </div>
+                </div>
               </div>
               
               <div className={`backdrop-blur-sm rounded-2xl shadow-xl border p-6 mb-8 ${dark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white/20'}`}>
@@ -408,6 +888,9 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                     const response = await api.post('/api/groups', groupData);
                     console.log('Group created:', response.data);
                     setGroupForm({ name: '', teacher: '', students: [] });
+                    setGroupStudentSearch('');
+                    setSelectedStudentGroup(response.data._id || 'ALL');
+                    setLastGroupCreated(response.data);
                     fetchData();
                   } catch (error) {
                     console.error('Group creation error:', error);
@@ -437,7 +920,7 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                       <option value="">Select Teacher</option>
                       {teachers.map((teacher) => (
                         <option key={teacher.teacherId} value={teacher.teacherId}>
-                          {teacher.name} ({teacher.teacherId})
+                          {teacher.name} ({teacher.department || 'No Branch'})
                         </option>
                       ))}
                     </select>
@@ -445,9 +928,21 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                   
                   <div>
                     <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Select Students</label>
+                    <div className="relative mb-3">
+                      <input
+                        type="text"
+                        value={groupStudentSearch}
+                        onChange={(e) => setGroupStudentSearch(e.target.value)}
+                        placeholder="Search students to add..."
+                        className={`w-full px-4 py-2.5 pl-10 border rounded-xl transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-purple-400/50' : 'bg-white/80 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-purple-500'} focus:outline-none focus:ring-2 focus:ring-purple-500/30`}
+                      />
+                      <svg className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                      </svg>
+                    </div>
                     <div className={`max-h-48 overflow-y-auto backdrop-blur-sm border rounded-xl p-4 ${dark ? 'bg-white/5 border-white/10' : 'bg-gray-50/50 border-gray-200'}`}>
                       <div className="space-y-2">
-                        {students.map((student) => (
+                        {visibleGroupStudents.map((student) => (
                           <label key={student.studentId} className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${dark ? 'hover:bg-white/5' : 'hover:bg-white/50'}`}>
                             <input
                               type="checkbox"
@@ -469,6 +964,9 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                             <span className={`text-sm font-medium ${dark ? 'text-gray-300' : 'text-gray-700'}`}>{student.name} ({student.studentId})</span>
                           </label>
                         ))}
+                        {visibleGroupStudents.length === 0 && (
+                          <p className={`text-sm py-2 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>No students found for this search.</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -501,7 +999,7 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                 </div>
                 
                 <div className="space-y-4">
-                  {groups.map((group) => (
+                  {visibleGroups.map((group) => (
                     <div key={group._id} className={`backdrop-blur-sm border rounded-xl p-6 hover:shadow-lg transition-all duration-200 ${dark ? 'bg-white/[0.03] border-white/10' : 'bg-gradient-to-r from-white/60 to-gray-50/60 border-gray-200/50'}`}>
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
@@ -524,7 +1022,7 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                               </div>
                               <div>
                                 <p className={`text-sm font-medium ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Teacher</p>
-                                <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-600'}`}>{group.teacher}</p>
+                                <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-600'}`}>{getTeacherDisplayName(group.teacher)}</p>
                               </div>
                             </div>
                             
@@ -542,27 +1040,48 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                           </div>
                         </div>
                         
-                        <button
-                          onClick={() => {
-                            setEditingGroup(group._id);
-                            setEditForm({
-                              name: group.name,
-                              teacher: group.teacher,
-                              students: group.students
-                            });
-                          }}
-                          className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center space-x-2"
-                        >
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-                          </svg>
-                          <span>Edit</span>
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setEditingGroup(group._id);
+                              setEditForm({
+                                name: group.name,
+                                teacher: group.teacher,
+                                students: group.students
+                              });
+                              setEditGroupStudentSearch('');
+                            }}
+                            className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center space-x-2"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                            </svg>
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const confirmed = window.confirm(`Delete group ${group.name}?`);
+                              if (!confirmed) return;
+                              try {
+                                await api.delete(`/api/groups/${group._id}`);
+                                await fetchData();
+                              } catch (error) {
+                                alert(getApiErrorMessage(error, 'Failed to delete group'));
+                              }
+                            }}
+                            className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center space-x-2"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2h.293l.91 10.11A2 2 0 007.196 18h5.608a2 2 0 001.993-1.89L15.707 6H16a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zm-1 4a1 1 0 012 0v8a1 1 0 11-2 0V6zm4-1a1 1 0 00-1 1v8a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
+                            </svg>
+                            <span>Delete</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
                   
-                  {groups.length === 0 && (
+                  {visibleGroups.length === 0 && (
                     <div className="text-center py-12">
                       <div className="w-16 h-16 bg-gradient-to-br from-gray-400 to-gray-500 rounded-full flex items-center justify-center mx-auto mb-4">
                         <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -577,9 +1096,91 @@ const AdminDashboard = ({ adminData, onLogout }) => {
               </div>
             </div>
           )}
-        </motion.div>
+        </div>
       </div>
       
+      {showAdminEditModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`backdrop-blur-xl rounded-2xl shadow-2xl max-w-xl w-full border ${dark ? 'bg-gray-900/95 border-white/10' : 'bg-white/95 border-white/20'}`}>
+            <div className={`p-6 border-b ${dark ? 'border-white/10' : 'border-gray-200/50'}`}>
+              <div className="flex items-center justify-between">
+                <h3 className={`text-xl font-bold ${dark ? 'text-gray-200' : 'text-gray-800'}`}>Edit Admin Profile</h3>
+                <button
+                  onClick={() => setShowAdminEditModal(false)}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200 ${dark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'}`}
+                >
+                  <svg className={`w-4 h-4 ${dark ? 'text-gray-400' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveAdminProfile} className="p-6 space-y-4">
+              <div>
+                <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Full Name</label>
+                <input
+                  type="text"
+                  value={adminProfileForm.name}
+                  onChange={(e) => setAdminProfileForm((prev) => ({ ...prev, name: e.target.value }))}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                  required
+                />
+              </div>
+              <div>
+                <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Email</label>
+                <input
+                  type="email"
+                  value={adminProfileForm.email}
+                  onChange={(e) => setAdminProfileForm((prev) => ({ ...prev, email: e.target.value }))}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                  required
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Institution</label>
+                  <input
+                    type="text"
+                    value={adminProfileForm.institution}
+                    onChange={(e) => setAdminProfileForm((prev) => ({ ...prev, institution: e.target.value }))}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Department</label>
+                  <input
+                    type="text"
+                    value={adminProfileForm.department}
+                    onChange={(e) => setAdminProfileForm((prev) => ({ ...prev, department: e.target.value }))}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-white border-gray-200 text-gray-900'}`}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={savingAdminProfile}
+                  className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg disabled:opacity-60"
+                >
+                  {savingAdminProfile ? 'Saving...' : 'Save Profile'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAdminEditModal(false)}
+                  className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {editingGroup && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className={`backdrop-blur-xl rounded-2xl shadow-2xl max-w-lg w-full border ${dark ? 'bg-gray-900/95 border-white/10' : 'bg-white/95 border-white/20'}`}>
@@ -637,7 +1238,7 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                   <option value="">Select Teacher</option>
                   {teachers.map((teacher) => (
                     <option key={teacher.teacherId} value={teacher.teacherId}>
-                      {teacher.name} ({teacher.teacherId})
+                      {teacher.name} ({teacher.department || 'No Branch'})
                     </option>
                   ))}
                 </select>
@@ -645,9 +1246,21 @@ const AdminDashboard = ({ adminData, onLogout }) => {
               
               <div>
                 <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Select Students</label>
+                <div className="relative mb-3">
+                  <input
+                    type="text"
+                    value={editGroupStudentSearch}
+                    onChange={(e) => setEditGroupStudentSearch(e.target.value)}
+                    placeholder="Search students to add..."
+                    className={`w-full px-4 py-2.5 pl-10 border rounded-xl transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-blue-400/50' : 'bg-white/80 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-500'} focus:outline-none focus:ring-2 focus:ring-blue-500/30`}
+                  />
+                  <svg className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                  </svg>
+                </div>
                 <div className={`max-h-48 overflow-y-auto backdrop-blur-sm border rounded-xl p-4 ${dark ? 'bg-white/5 border-white/10' : 'bg-gray-50/50 border-gray-200'}`}>
                   <div className="space-y-2">
-                    {students.map((student) => (
+                    {visibleEditGroupStudents.map((student) => (
                       <label key={student.studentId} className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${dark ? 'hover:bg-white/5' : 'hover:bg-white/50'}`}>
                         <input
                           type="checkbox"
@@ -669,6 +1282,9 @@ const AdminDashboard = ({ adminData, onLogout }) => {
                         <span className={`text-sm font-medium ${dark ? 'text-gray-300' : 'text-gray-700'}`}>{student.name} ({student.studentId})</span>
                       </label>
                     ))}
+                    {visibleEditGroupStudents.length === 0 && (
+                      <p className={`text-sm py-2 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>No students found for this search.</p>
+                    )}
                   </div>
                 </div>
               </div>

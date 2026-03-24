@@ -15,7 +15,6 @@ import PersonalAchievements from "./components/PersonalAchievements";
 import StudentProfile from "./components/StudentProfile";
 import ViewProfile from "./components/ViewProfile";
 import Projects from "./components/Projects";
-import AcademicRecords from "./components/AcademicRecords";
 import AcademicCertificatesNew from "./components/AcademicCertificatesNew";
 import ProfessionalPortfolio from "./components/ProfessionalPortfolio";
 import ResumePortfolioEditor from "./components/ResumePortfolioEditor";
@@ -24,7 +23,6 @@ import TeacherLogin from "./components/TeacherLogin";
 import TeacherRegister from "./components/TeacherRegister";
 import TeacherDashboard from "./components/TeacherDashboard";
 import AdminLogin from "./components/AdminLogin";
-import AdminRegister from "./components/AdminRegister";
 import AdminDashboard from "./components/AdminDashboard";
 import StudentDetails from "./components/StudentDetails";
 import Leaderboard from "./components/Leaderboard";
@@ -45,7 +43,7 @@ const PageTransition = ({ children }) => (
 );
 
 // Animated routes component (needs useLocation inside Router)
-const AnimatedRoutes = ({ studentData, teacherData, adminData, handleLogin, handleTeacherLogin, handleLogout, handleTeacherLogout, handleAdminLogin, handleAdminLogout }) => {
+const AnimatedRoutes = ({ studentData, teacherData, adminData, handleLogin, handleTeacherLogin, handleLogout, handleTeacherLogout, handleTeacherUpdate, handleAdminLogin, handleAdminLogout, handleAdminUpdate }) => {
   const location = useLocation();
   return (
     <AnimatePresence mode="wait">
@@ -145,16 +143,6 @@ const AnimatedRoutes = ({ studentData, teacherData, adminData, handleLogin, hand
           }
         />
         <Route
-          path="/academic-records"
-          element={
-            studentData ? (
-              <PageTransition><AcademicRecords studentData={studentData} /></PageTransition>
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        />
-        <Route
           path="/academic-certificates"
           element={
             studentData ? (
@@ -218,7 +206,7 @@ const AnimatedRoutes = ({ studentData, teacherData, adminData, handleLogin, hand
           path="/teacher/dashboard"
           element={
             teacherData ? (
-              <PageTransition><TeacherDashboard teacherData={teacherData} onLogout={handleTeacherLogout} /></PageTransition>
+              <PageTransition><TeacherDashboard teacherData={teacherData} onLogout={handleTeacherLogout} onTeacherUpdate={handleTeacherUpdate} /></PageTransition>
             ) : (
               <Navigate to="/teacher/login" />
             )
@@ -240,7 +228,7 @@ const AnimatedRoutes = ({ studentData, teacherData, adminData, handleLogin, hand
             adminData ? (
               <Navigate to="/admin/dashboard" />
             ) : (
-              <PageTransition><AdminRegister onRegister={handleAdminLogin} /></PageTransition>
+              <Navigate to="/admin/login" />
             )
           }
         />
@@ -248,7 +236,7 @@ const AnimatedRoutes = ({ studentData, teacherData, adminData, handleLogin, hand
           path="/admin/dashboard"
           element={
             adminData ? (
-              <PageTransition><AdminDashboard adminData={adminData} onLogout={handleAdminLogout} /></PageTransition>
+              <PageTransition><AdminDashboard adminData={adminData} onLogout={handleAdminLogout} onAdminUpdate={handleAdminUpdate} /></PageTransition>
             ) : (
               <Navigate to="/admin/login" />
             )
@@ -316,6 +304,11 @@ function App() {
     sessionStorage.removeItem("teacherData");
   };
 
+  const handleTeacherUpdate = (data) => {
+    setTeacherData(data);
+    sessionStorage.setItem("teacherData", JSON.stringify(data));
+  };
+
   const handleAdminLogin = (data) => {
     setAdminData(data);
     sessionStorage.setItem("adminData", JSON.stringify(data));
@@ -324,6 +317,11 @@ function App() {
   const handleAdminLogout = () => {
     setAdminData(null);
     sessionStorage.removeItem("adminData");
+  };
+
+  const handleAdminUpdate = (data) => {
+    setAdminData(data);
+    sessionStorage.setItem("adminData", JSON.stringify(data));
   };
 
   if (isLoading) {
@@ -356,8 +354,10 @@ function App() {
         handleTeacherLogin={handleTeacherLogin}
         handleLogout={handleLogout}
         handleTeacherLogout={handleTeacherLogout}
+        handleTeacherUpdate={handleTeacherUpdate}
         handleAdminLogin={handleAdminLogin}
         handleAdminLogout={handleAdminLogout}
+        handleAdminUpdate={handleAdminUpdate}
       />
     </Router>
   );

@@ -84,6 +84,7 @@ const AdminRegister = ({ onRegister }) => {
               name="name"
               value={formData.name}
               onChange={handleChange}
+              autoComplete="name"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               required
             />
@@ -98,6 +99,7 @@ const AdminRegister = ({ onRegister }) => {
               name="email"
               value={formData.email}
               onChange={handleChange}
+              autoComplete="email"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               required
             />
@@ -112,6 +114,7 @@ const AdminRegister = ({ onRegister }) => {
               name="institution"
               value={formData.institution}
               onChange={handleChange}
+              autoComplete="organization"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               required
             />
@@ -126,6 +129,7 @@ const AdminRegister = ({ onRegister }) => {
               name="department"
               value={formData.department}
               onChange={handleChange}
+              autoComplete="organization-title"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               required
             />
@@ -140,6 +144,7 @@ const AdminRegister = ({ onRegister }) => {
               name="password"
               value={formData.password}
               onChange={handleChange}
+              autoComplete="new-password"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               required
             />
@@ -154,6 +159,7 @@ const AdminRegister = ({ onRegister }) => {
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
+              autoComplete="new-password"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               required
             />

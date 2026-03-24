@@ -48,6 +48,7 @@ const AdminLogin = ({ onLogin }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setIsLoading(true);
     try {
       const response = await api.post('/api/admin/login', formData);
@@ -132,6 +133,7 @@ const AdminLogin = ({ onLogin }) => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
+                autoComplete="email"
                 className="w-full px-4 py-3 bg-white/[0.06] border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 placeholder-gray-500 text-sm text-white"
                 placeholder="Enter your email"
                 required
@@ -145,6 +147,7 @@ const AdminLogin = ({ onLogin }) => {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
+                autoComplete="current-password"
                 className="w-full px-4 py-3 bg-white/[0.06] border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all duration-300 placeholder-gray-500 text-sm text-white"
                 placeholder="Enter your password"
                 required
@@ -193,15 +196,6 @@ const AdminLogin = ({ onLogin }) => {
             </svg>
             <span>{isLoading ? 'Redirecting...' : 'Login with Outlook'}</span>
           </motion.button>
-
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => navigate('/admin/register')}
-              className="text-purple-400 hover:text-purple-300 font-medium text-sm transition-colors duration-200"
-            >
-              Need admin access? Register here
-            </button>
-          </div>
 
           <div className="mt-3 text-center">
             <button

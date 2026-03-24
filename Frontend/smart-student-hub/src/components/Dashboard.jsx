@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../services/api";
@@ -9,16 +9,22 @@ import ChatBot from "./ChatBot";
 
 const Dashboard = ({ studentData, onLogout }) => {
   const navigate = useNavigate();
-  const [backendStatus, setBackendStatus] = useState("Connecting...");
   const [showNotification, setShowNotification] = useState(false);
   const [messages, setMessages] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [showMessages, setShowMessages] = useState(false);
   const [profileData, setProfileData] = useState({});
-  const [studentFullData, setStudentFullData] = useState({});
+  const [studentGroups, setStudentGroups] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [toastNotif, setToastNotif] = useState(null);
+  const [dashboardStats, setDashboardStats] = useState({
+    cgpa: null,
+    projectCount: 0,
+    certificateCount: 0,
+    semesterCount: 0,
+  });
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const socketRef = useRef(null);
   const [dark, setDark] = useState(() => {
     try { return JSON.parse(localStorage.getItem('student-dark-mode')) ?? true; } catch { return true; }
@@ -75,77 +81,64 @@ const Dashboard = ({ studentData, onLogout }) => {
     };
   }, [studentData?.studentId]);
 
+  const fetchDashboardData = useCallback(async () => {
+    if (!studentData?.studentId) {
+      return;
+    }
+
+    try {
+      const [
+        messagesRes,
+        unreadMessagesRes,
+        notifRes,
+        unreadNotifRes,
+        profileRes,
+        projectsRes,
+        certsRes,
+        marksRes,
+        groupsRes,
+      ] = await Promise.all([
+        api.get(`/api/messages/student/${studentData.studentId}`),
+        api.get(`/api/messages/unread-count/${studentData.studentId}`),
+        api.get(`/api/notifications/${studentData.studentId}`),
+        api.get(`/api/notifications/unread-count/${studentData.studentId}`),
+        api.get(`/api/profile/${studentData.studentId}`),
+        api.get(`/api/projects/${studentData.studentId}`),
+        api.get(`/api/certificates/${studentData.studentId}`),
+        api.get(`/api/students/${studentData.studentId}/marks`),
+        api.get(`/api/student/groups/${studentData.studentId}`),
+      ]);
+
+      setMessages(Array.isArray(messagesRes.data) ? messagesRes.data : []);
+      setUnreadCount(unreadMessagesRes.data?.unreadCount || 0);
+      setNotifications(Array.isArray(notifRes.data) ? notifRes.data : []);
+      setUnreadNotifCount(unreadNotifRes.data?.unreadCount || 0);
+      setProfileData(profileRes.data || {});
+      setStudentGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
+      setDashboardStats({
+        cgpa: marksRes.data?.cgpa ?? null,
+        projectCount: Array.isArray(projectsRes.data) ? projectsRes.data.length : 0,
+        certificateCount: Array.isArray(certsRes.data) ? certsRes.data.length : 0,
+        semesterCount: Array.isArray(marksRes.data?.semesterMarks) ? marksRes.data.semesterMarks.length : 0,
+      });
+      setLastSyncedAt(new Date());
+    } catch (error) {
+      console.error("Error fetching dashboard data:", error);
+    }
+  }, [studentData?.studentId]);
+
   useEffect(() => {
-    const testConnection = async () => {
-      try {
-        const response = await api.get("/api/test");
-        setBackendStatus(response.data.message);
-      } catch (error) {
-        setBackendStatus("Backend connection failed");
-      }
-    };
+    fetchDashboardData();
 
-    const fetchMessages = async () => {
-      if (studentData?.studentId) {
-        try {
-          const [messagesRes, unreadRes] = await Promise.all([
-            api.get(`/api/messages/student/${studentData.studentId}`),
-            api.get(`/api/messages/unread-count/${studentData.studentId}`),
-          ]);
-          setMessages(messagesRes.data);
-          setUnreadCount(unreadRes.data.unreadCount);
-        } catch (error) {
-          console.error("Error fetching messages:", error);
-        }
-      }
-    };
+    const intervalId = setInterval(fetchDashboardData, 10000);
+    const onFocus = () => fetchDashboardData();
+    window.addEventListener('focus', onFocus);
 
-    const fetchNotifications = async () => {
-      if (studentData?.studentId) {
-        try {
-          const [notifRes, unreadRes] = await Promise.all([
-            api.get(`/api/notifications/${studentData.studentId}`),
-            api.get(`/api/notifications/unread-count/${studentData.studentId}`),
-          ]);
-          setNotifications(notifRes.data);
-          setUnreadNotifCount(unreadRes.data.unreadCount);
-        } catch (error) {
-          console.error("Error fetching notifications:", error);
-        }
-      }
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
     };
-
-    const fetchProfile = async () => {
-      if (studentData?.studentId) {
-        try {
-          const [profileRes, studentRes, projectsRes, certsRes, marksRes] =
-            await Promise.all([
-              api.get(`/api/profile/${studentData.studentId}`),
-              api.get(`/api/students/${studentData.studentId}`),
-              api.get(`/api/projects/${studentData.studentId}`),
-              api.get(`/api/certificates/${studentData.studentId}`),
-              api.get(`/api/students/${studentData.studentId}/marks`),
-            ]);
-          setProfileData(profileRes.data);
-          setStudentFullData({
-            ...studentRes.data,
-            profile: profileRes.data,
-            projects: projectsRes.data,
-            certificates: certsRes.data,
-            semesterMarks: marksRes.data.semesterMarks,
-            cgpa: marksRes.data.cgpa,
-          });
-        } catch (error) {
-          console.error("Error fetching profile:", error);
-        }
-      }
-    };
-
-    testConnection();
-    fetchMessages();
-    fetchNotifications();
-    fetchProfile();
-  }, [studentData]);
+  }, [fetchDashboardData]);
 
   const markNotificationRead = async (notifId) => {
     try {
@@ -527,43 +520,57 @@ const Dashboard = ({ studentData, onLogout }) => {
                 </button>
               </div>
             </div>
+            {lastSyncedAt && (
+              <div className="mt-6">
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${dark ? "bg-blue-500/20 text-blue-200" : "bg-blue-100 text-blue-700"}`}>
+                  Last Sync: {lastSyncedAt.toLocaleTimeString()}
+                </span>
+              </div>
+            )}
           </div>
         </motion.div>
+
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className={`rounded-2xl p-4 border ${dark ? "bg-white/[0.04] border-white/10" : "bg-white/70 border-white/30"}`}>
+            <p className={`text-xs font-medium uppercase ${dark ? "text-gray-400" : "text-gray-500"}`}>CGPA</p>
+            <p className="text-2xl font-bold text-emerald-500">{dashboardStats.cgpa ?? "N/A"}</p>
+          </div>
+          <div className={`rounded-2xl p-4 border ${dark ? "bg-white/[0.04] border-white/10" : "bg-white/70 border-white/30"}`}>
+            <p className={`text-xs font-medium uppercase ${dark ? "text-gray-400" : "text-gray-500"}`}>Projects</p>
+            <p className="text-2xl font-bold text-indigo-500">{dashboardStats.projectCount}</p>
+          </div>
+          <div className={`rounded-2xl p-4 border ${dark ? "bg-white/[0.04] border-white/10" : "bg-white/70 border-white/30"}`}>
+            <p className={`text-xs font-medium uppercase ${dark ? "text-gray-400" : "text-gray-500"}`}>Certificates</p>
+            <p className="text-2xl font-bold text-purple-500">{dashboardStats.certificateCount}</p>
+          </div>
+          <div className={`rounded-2xl p-4 border ${dark ? "bg-white/[0.04] border-white/10" : "bg-white/70 border-white/30"}`}>
+            <p className={`text-xs font-medium uppercase ${dark ? "text-gray-400" : "text-gray-500"}`}>Semesters</p>
+            <p className="text-2xl font-bold text-orange-500">{dashboardStats.semesterCount}</p>
+          </div>
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
-            onClick={() => navigate("/academic-records")}
+            transition={{ duration: 0.5, delay: 0.05 }}
+            className={`backdrop-blur-2xl rounded-3xl shadow-xl p-8 border relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10" : "bg-white/60 border-white/30"}`}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-fuchsia-500/10"></div>
             <div className="relative z-10">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <svg
-                  className="w-8 h-8 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-                  />
+              <div className="w-16 h-16 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg">
+                <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
                 </svg>
               </div>
-              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-blue-400" : "text-gray-800 group-hover:text-blue-700"}`}>
-                Academic Records
-              </h3>
-              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
-                View your academic performance and track your progress
+              <h3 className={`text-xl font-bold mb-2 ${dark ? "text-gray-200" : "text-gray-800"}`}>My Groups</h3>
+              <p className={`mb-3 ${dark ? "text-gray-400" : "text-gray-600"}`}>Assigned groups update automatically</p>
+              <p className="text-2xl font-bold text-violet-600 mb-2">{studentGroups.length}</p>
+              <p className={`text-sm ${dark ? "text-gray-400" : "text-gray-600"}`}>
+                {studentGroups.length > 0
+                  ? studentGroups.slice(0, 2).map((g) => g.name).join(', ')
+                  : 'No groups assigned yet'}
               </p>
-              <div className="mt-4 flex items-center text-blue-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
-                <span className="text-sm">Explore →</span>
-              </div>
             </div>
           </motion.div>
 
@@ -838,10 +845,10 @@ const Dashboard = ({ studentData, onLogout }) => {
               {(notifMeta[toastNotif.type] || notifMeta.system).icon}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-semibold text-gray-800 text-sm">{toastNotif.title}</p>
-              <p className="text-sm text-gray-600 line-clamp-2 mt-0.5">{toastNotif.body}</p>
+              <p className={`font-semibold text-sm ${dark ? "text-gray-100" : "text-gray-800"}`}>{toastNotif.title}</p>
+              <p className={`text-sm line-clamp-2 mt-0.5 ${dark ? "text-gray-300" : "text-gray-600"}`}>{toastNotif.body}</p>
               {toastNotif.senderName && (
-                <p className="text-xs text-gray-400 mt-1">From: {toastNotif.senderName}</p>
+                <p className={`text-xs mt-1 ${dark ? "text-gray-400" : "text-gray-400"}`}>From: {toastNotif.senderName}</p>
               )}
             </div>
             <button

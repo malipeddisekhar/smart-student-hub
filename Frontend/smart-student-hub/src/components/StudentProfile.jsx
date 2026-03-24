@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-const backendUrl = import.meta.env.VITE_API_URL;
 
 const StudentProfile = ({ studentData }) => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState({});
   const [selectedImage, setSelectedImage] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
+  const [removedCertificates, setRemovedCertificates] = useState([]);
   const [formData, setFormData] = useState({
     profileImage: null,
     aadharNumber: '',
@@ -23,35 +26,33 @@ const StudentProfile = ({ studentData }) => {
   });
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (studentData?.studentId) {
+      fetchProfile();
+    }
+  }, [studentData?.studentId]);
 
   const fetchProfile = async () => {
     try {
-      console.log('Fetching profile for student:', studentData.studentId);
+      setLoadingProfile(true);
       const response = await api.get(`/api/profile/${studentData.studentId}`);
-      console.log('Profile data received:', response.data);
       setProfile(response.data);
-      setFormData({ ...formData, ...response.data });
+      setFormData((prev) => ({ ...prev, ...response.data }));
+      setRemovedCertificates([]);
     } catch (error) {
       console.error('Error fetching profile:', error);
       if (error.response?.status === 404) {
-        console.log('Profile not found, will create new one on first save');
+        setStatusMessage({ type: 'info', text: 'Profile not found yet. It will be created when you save.' });
       }
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSavingProfile(true);
+    setStatusMessage({ type: '', text: '' });
     try {
-      console.log('Student Data:', studentData);
-      console.log('API Base URL:', api.defaults.baseURL);
-      console.log('Profile URL:', `/api/profile/${studentData.studentId}`);
-      
-      // Test backend connection first
-      await api.get('/api/test');
-      console.log('Backend connection successful');
-      
       const formDataToSend = new FormData();
       
       Object.keys(formData).forEach(key => {
@@ -59,29 +60,32 @@ const StudentProfile = ({ studentData }) => {
           formDataToSend.append(key, formData[key]);
         }
       });
+
+      removedCertificates.forEach((field) => {
+        formDataToSend.append(field, '__REMOVE__');
+      });
       
-      console.log('Making request to:', `${api.defaults.baseURL}/api/profile/${studentData.studentId}`);
-      const response = await api.put(`/api/profile/${studentData.studentId}`, formDataToSend, {
+      await api.put(`/api/profile/${studentData.studentId}`, formDataToSend, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
-      console.log('Profile update response:', response.data);
-      fetchProfile();
-      alert('Profile updated successfully!');
+      await fetchProfile();
+      setStatusMessage({ type: 'success', text: 'Profile updated successfully.' });
     } catch (error) {
-      console.error('Full error:', error);
-      console.error('Error response:', error.response);
-      if (error.response?.status === 404) {
-        alert('Backend server not running or endpoint not found. Please start the backend server.');
-      } else {
-        alert('Error updating profile: ' + (error.response?.data?.error || error.message));
-      }
+      console.error('Error updating profile:', error);
+      setStatusMessage({
+        type: 'error',
+        text: error.response?.data?.error || 'Unable to update profile right now.',
+      });
+    } finally {
+      setSavingProfile(false);
     }
   };
 
   const handleChange = (e) => {
     if (e.target.type === 'file') {
       setFormData({ ...formData, [e.target.name]: e.target.files[0] });
+      setRemovedCertificates((prev) => prev.filter((field) => field !== e.target.name));
     } else {
       setFormData({ ...formData, [e.target.name]: e.target.value });
     }
@@ -91,6 +95,7 @@ const StudentProfile = ({ studentData }) => {
     if (window.confirm('Are you sure you want to delete this certificate?')) {
       setProfile({ ...profile, [certName]: null });
       setFormData({ ...formData, [certName]: null });
+      setRemovedCertificates((prev) => (prev.includes(certName) ? prev : [...prev, certName]));
     }
   };
 
@@ -118,6 +123,19 @@ const StudentProfile = ({ studentData }) => {
       </nav>
 
       <div className="container mx-auto px-6 py-8">
+        {statusMessage.text && (
+          <div
+            className={`mb-6 rounded-xl border px-4 py-3 text-sm font-medium ${
+              statusMessage.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : statusMessage.type === 'error'
+                ? 'bg-red-50 border-red-200 text-red-700'
+                : 'bg-blue-50 border-blue-200 text-blue-700'
+            }`}
+          >
+            {statusMessage.text}
+          </div>
+        )}
         <div className="bg-white/70 backdrop-blur-2xl rounded-3xl shadow-2xl p-8 border border-white/30 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5"></div>
           <div className="relative z-10">
@@ -331,13 +349,14 @@ const StudentProfile = ({ studentData }) => {
                 <div className="text-center">
                 <button
                   type="submit"
+                  disabled={savingProfile || loadingProfile}
                   className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-800 text-white py-4 px-12 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-2xl hover:shadow-3xl"
                 >
                   <div className="flex items-center space-x-3">
                     <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                     </svg>
-                    <span>Update Profile</span>
+                    <span>{savingProfile ? 'Saving...' : 'Update Profile'}</span>
                   </div>
                 </button>
               </div>

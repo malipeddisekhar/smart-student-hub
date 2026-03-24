@@ -55,6 +55,61 @@ function escapeRegExp(string) {
 const app = express();
 const port = process.env.PORT || 3000;
 
+const ALLOWED_ADMIN_EMAILS = ['adminsekhar@gmail.com', 'adminprasad@gmail.com'];
+
+function normalizeAdminEmail(email) {
+  return String(email || '').trim().toLowerCase().replace(/\s+/g, '');
+}
+
+async function enforceAdminWhitelist() {
+  try {
+    const normalizedAllowed = ALLOWED_ADMIN_EMAILS.map(normalizeAdminEmail);
+
+    // Remove any admin account that is not explicitly allowed.
+    await Admin.deleteMany({ email: { $nin: normalizedAllowed } });
+
+    const defaultPasswordHash = await bcrypt.hash('admin', 10);
+    const defaults = [
+      {
+        email: 'adminsekhar@gmail.com',
+        name: 'Admin Sekhar',
+        institution: 'GMRIT',
+        department: 'CSE',
+        role: 'Super Admin',
+      },
+      {
+        email: 'adminprasad@gmail.com',
+        name: 'Admin Prasad',
+        institution: 'GMRIT',
+        department: 'CSE',
+        role: 'Super Admin',
+      },
+    ];
+
+    for (const item of defaults) {
+      const existing = await Admin.findOne({ email: item.email });
+      if (!existing) {
+        const admin = new Admin({
+          ...item,
+          password: defaultPasswordHash,
+        });
+        await admin.save();
+      } else {
+        existing.password = defaultPasswordHash;
+        existing.name = item.name;
+        existing.institution = item.institution;
+        existing.department = item.department;
+        existing.role = item.role;
+        await existing.save();
+      }
+    }
+
+    console.log('Admin whitelist enforced successfully');
+  } catch (error) {
+    console.error('Failed to enforce admin whitelist:', error.message);
+  }
+}
+
 // Create HTTP server and attach Socket.IO
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -112,6 +167,9 @@ const personalUpload = multer({ storage: personalStorage });
 
 // Connect to MongoDB
 connectDB();
+setTimeout(() => {
+  enforceAdminWhitelist();
+}, 2000);
 
 // Middleware
 app.use(cors({
@@ -236,32 +294,9 @@ app.get("/api/colleges", async (req, res) => {
 // ---------------------
 app.post("/api/admin/register", async (req, res) => {
   try {
-    const { password, confirmPassword, ...adminData } = req.body;
-
-    if (password !== confirmPassword) {
-      return res.status(400).json({ error: "Passwords do not match" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const admin = new Admin({ ...adminData, password: hashedPassword });
-    await admin.save();
-
-    // Automatically create college if not exists
-    const existingCollege = await College.findOne({ name: admin.institution });
-    if (!existingCollege && admin.institution && admin.department) {
-      const collegeCode = admin.institution.replace(/\s+/g, '').substring(0, 6).toUpperCase();
-      const deptCode = admin.department.replace(/\s+/g, '').substring(0, 4).toUpperCase();
-      const newCollege = new College({
-        name: admin.institution,
-        code: collegeCode,
-        address: 'Not specified',
-        departments: [{ name: admin.department, code: deptCode }],
-        createdBy: admin.adminId
-      });
-      await newCollege.save();
-    }
-
-    res.status(201).json({ message: "Admin registered successfully", adminId: admin.adminId, name: admin.name });
+    return res.status(403).json({
+      error: 'Admin self-registration is disabled. Only authorized admins can access the system.',
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -270,14 +305,74 @@ app.post("/api/admin/register", async (req, res) => {
 app.post("/api/admin/login", async (req, res) => {
   try {
     const { email, password } = req.body;
-    const admin = await Admin.findOne({ email: new RegExp('^' + escapeRegExp(email) + '$', 'i') });
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    const normalizedEmail = normalizeAdminEmail(email);
+    if (!ALLOWED_ADMIN_EMAILS.includes(normalizedEmail)) {
+      return res.status(400).json({ error: "Invalid email or password" });
+    }
+    const admin = await Admin.findOne({ email: new RegExp('^' + escapeRegExp(normalizedEmail) + '$', 'i') });
     if (!admin) return res.status(400).json({ error: "Invalid email or password" });
 
     const valid = await bcrypt.compare(password, admin.password);
     if (!valid) return res.status(400).json({ error: "Invalid email or password" });
 
-    res.json({ message: "Login successful", adminId: admin.adminId, name: admin.name });
+    res.json({
+      message: "Login successful",
+      adminId: admin.adminId,
+      name: admin.name,
+      email: admin.email,
+      institution: admin.institution,
+      department: admin.department,
+      role: admin.role,
+    });
   } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/admin/profile/:adminId', async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const admin = await Admin.findOne({ adminId });
+    if (!admin) return res.status(404).json({ error: 'Admin not found' });
+
+    const allowedFields = ['name', 'email', 'institution', 'department', 'role'];
+    for (const field of allowedFields) {
+      if (field in req.body) {
+        if (field === 'email') {
+          const normalizedEmail = normalizeAdminEmail(req.body.email);
+          if (!ALLOWED_ADMIN_EMAILS.includes(normalizedEmail)) {
+            return res.status(403).json({ error: 'Only approved admin emails are allowed.' });
+          }
+          admin.email = normalizedEmail;
+        } else {
+          admin[field] = req.body[field];
+        }
+      }
+    }
+
+    await admin.save();
+
+    res.json({
+      message: 'Admin profile updated successfully',
+      adminId: admin.adminId,
+      name: admin.name,
+      email: admin.email,
+      institution: admin.institution,
+      department: admin.department,
+      role: admin.role,
+    });
+  } catch (error) {
+    if (error?.code === 11000 && error?.keyPattern?.email) {
+      return res.status(409).json({ error: 'Email already exists. Use another email.' });
+    }
+    if (error?.name === 'ValidationError') {
+      const details = Object.values(error.errors || {}).map((e) => e.message);
+      return res.status(400).json({ error: 'Validation failed', details });
+    }
     res.status(400).json({ error: error.message });
   }
 });
@@ -368,7 +463,58 @@ app.post("/api/teacher/login", async (req, res) => {
     const valid = await bcrypt.compare(password, teacher.password);
     if (!valid) return res.status(400).json({ error: "Invalid email or password" });
 
-    res.json({ message: "Login successful", teacherId: teacher.teacherId, name: teacher.name });
+    res.json({
+      message: "Login successful",
+      teacherId: teacher.teacherId,
+      name: teacher.name,
+      email: teacher.email,
+      department: teacher.department,
+      college: teacher.college,
+      designation: teacher.designation,
+      experience: teacher.experience,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/teacher/profile/:teacherId', async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    const { name, email, department, college, designation, experience } = req.body;
+
+    const teacher = await Teacher.findOne({ teacherId });
+    if (!teacher) return res.status(404).json({ error: 'Teacher not found' });
+
+    const normalizedEmail = String(email || teacher.email).trim().toLowerCase();
+    if (!normalizedEmail) return res.status(400).json({ error: 'Email is required' });
+
+    const duplicate = await Teacher.findOne({
+      teacherId: { $ne: teacherId },
+      email: new RegExp('^' + escapeRegExp(normalizedEmail) + '$', 'i')
+    });
+    if (duplicate) {
+      return res.status(409).json({ error: 'Email already in use by another teacher' });
+    }
+
+    teacher.name = String(name || teacher.name).trim();
+    teacher.email = normalizedEmail;
+    teacher.department = String(department || teacher.department).trim();
+    teacher.college = String(college || teacher.college).trim();
+    teacher.designation = String(designation || teacher.designation || 'Assistant Professor').trim();
+    teacher.experience = Number.isFinite(Number(experience)) ? Number(experience) : teacher.experience;
+
+    await teacher.save();
+
+    res.json({
+      teacherId: teacher.teacherId,
+      name: teacher.name,
+      email: teacher.email,
+      department: teacher.department,
+      college: teacher.college,
+      designation: teacher.designation,
+      experience: teacher.experience,
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -487,11 +633,294 @@ app.delete("/api/academic-certificates/:studentId/:certificateId", async (req, r
 // ---------------------
 // Teacher groups
 // ---------------------
+app.post('/api/groups', async (req, res) => {
+  try {
+    const { name, college, department, teacher, students, createdBy } = req.body;
+
+    if (!name || !college || !department || !teacher || !createdBy) {
+      return res.status(400).json({ error: 'Name, college, department, teacher, and createdBy are required' });
+    }
+
+    const teacherExists = await Teacher.findOne({ teacherId: teacher }).lean();
+    if (!teacherExists) {
+      return res.status(404).json({ error: 'Selected teacher not found' });
+    }
+
+    const studentIds = Array.isArray(students) ? students : [];
+    if (studentIds.length > 0) {
+      const validStudents = await Student.countDocuments({ studentId: { $in: studentIds } });
+      if (validStudents !== studentIds.length) {
+        return res.status(400).json({ error: 'One or more selected students are invalid' });
+      }
+    }
+
+    const group = new Group({
+      name: String(name).trim(),
+      college: String(college).trim(),
+      department: String(department).trim(),
+      teacher,
+      students: studentIds,
+      createdBy,
+    });
+
+    await group.save();
+    res.status(201).json(group);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/groups/:adminId', async (req, res) => {
+  try {
+    const { adminId } = req.params;
+    const groups = await Group.find({ createdBy: adminId }).sort({ createdAt: -1 }).lean();
+    res.json(groups);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/groups/:groupId', async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ error: 'Group not found' });
+
+    const { name, teacher, students } = req.body;
+
+    if (name !== undefined) group.name = String(name).trim();
+
+    if (teacher !== undefined) {
+      const teacherExists = await Teacher.findOne({ teacherId: teacher }).lean();
+      if (!teacherExists) {
+        return res.status(404).json({ error: 'Selected teacher not found' });
+      }
+      group.teacher = teacher;
+    }
+
+    if (students !== undefined) {
+      const studentIds = Array.isArray(students) ? students : [];
+      if (studentIds.length > 0) {
+        const validStudents = await Student.countDocuments({ studentId: { $in: studentIds } });
+        if (validStudents !== studentIds.length) {
+          return res.status(400).json({ error: 'One or more selected students are invalid' });
+        }
+      }
+      group.students = studentIds;
+    }
+
+    await group.save();
+    res.json({ message: 'Group updated successfully', group });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.delete('/api/groups/:groupId', async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const deleted = await Group.findByIdAndDelete(groupId);
+    if (!deleted) return res.status(404).json({ error: 'Group not found' });
+    res.json({ message: 'Group deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 app.get('/api/teacher/groups/:teacherId', async (req, res) => {
   try {
     const { teacherId } = req.params;
     const groups = await Group.find({ teacher: teacherId });
     res.json(groups);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/teacher/students/:teacherId', async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    const groups = await Group.find({ teacher: teacherId }).lean();
+
+    if (!groups.length) {
+      return res.json([]);
+    }
+
+    const groupNamesByStudentId = new Map();
+    for (const group of groups) {
+      for (const sid of group.students || []) {
+        if (!groupNamesByStudentId.has(sid)) {
+          groupNamesByStudentId.set(sid, new Set());
+        }
+        groupNamesByStudentId.get(sid).add(group.name);
+      }
+    }
+
+    const studentIds = Array.from(groupNamesByStudentId.keys());
+    const students = await Student.find({ studentId: { $in: studentIds } }).lean();
+
+    const enriched = students.map((student) => {
+      const { password, __v, ...safeStudent } = student;
+      return {
+        ...safeStudent,
+        groupName: Array.from(groupNamesByStudentId.get(student.studentId) || []).join(', '),
+      };
+    });
+
+    res.json(enriched);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+function recalculateCgpa(semesterMarks = []) {
+  if (!Array.isArray(semesterMarks) || semesterMarks.length === 0) return 0;
+  const validSgpas = semesterMarks
+    .map((m) => Number(m.sgpa))
+    .filter((sgpa) => Number.isFinite(sgpa) && sgpa > 0);
+
+  if (validSgpas.length === 0) return 0;
+  const total = validSgpas.reduce((sum, sgpa) => sum + sgpa, 0);
+  return Number((total / validSgpas.length).toFixed(2));
+}
+
+// Add semester marks for a student (teacher scope)
+app.post('/api/teacher/marks/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { teacherId, semester, year, sgpa, subjects } = req.body;
+
+    const normalizedTeacherId = String(teacherId || '').trim();
+    if (!normalizedTeacherId) {
+      return res.status(400).json({ error: 'teacherId is required.' });
+    }
+
+    const assigned = await Group.exists({ teacher: normalizedTeacherId, students: studentId });
+    if (!assigned) {
+      return res.status(403).json({ error: 'Teacher is not assigned to this student.' });
+    }
+
+    const sem = Number(semester);
+    const yr = Number(year);
+    const gpa = Number(sgpa);
+
+    if (!Number.isInteger(sem) || sem <= 0) {
+      return res.status(400).json({ error: 'Valid semester is required.' });
+    }
+    if (!Number.isInteger(yr) || yr <= 0) {
+      return res.status(400).json({ error: 'Valid year is required.' });
+    }
+    if (!Number.isFinite(gpa) || gpa <= 0 || gpa > 10) {
+      return res.status(400).json({ error: 'SGPA must be a number between 0 and 10.' });
+    }
+
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found.' });
+
+    const existing = (student.semesterMarks || []).find(
+      (m) => Number(m.semester) === sem && Number(m.year) === yr
+    );
+
+    if (existing) {
+      return res.status(409).json({ error: 'Marks for this semester and year already exist. Use update.' });
+    }
+
+    student.semesterMarks.push({
+      semester: sem,
+      year: yr,
+      sgpa: gpa,
+      subjects: Array.isArray(subjects) ? subjects : [],
+    });
+    student.cgpa = recalculateCgpa(student.semesterMarks);
+    await student.save();
+
+    res.json({
+      message: 'Marks added successfully.',
+      studentId: student.studentId,
+      semesterMarks: student.semesterMarks,
+      cgpa: student.cgpa,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Update semester marks (SGPA) for a student (teacher scope)
+app.put('/api/teacher/marks/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { teacherId, semester, year, sgpa } = req.body;
+
+    const normalizedTeacherId = String(teacherId || '').trim();
+    if (!normalizedTeacherId) {
+      return res.status(400).json({ error: 'teacherId is required.' });
+    }
+
+    const assigned = await Group.exists({ teacher: normalizedTeacherId, students: studentId });
+    if (!assigned) {
+      return res.status(403).json({ error: 'Teacher is not assigned to this student.' });
+    }
+
+    const sem = Number(semester);
+    const yr = Number(year);
+    const gpa = Number(sgpa);
+
+    if (!Number.isInteger(sem) || sem <= 0) {
+      return res.status(400).json({ error: 'Valid semester is required.' });
+    }
+    if (!Number.isInteger(yr) || yr <= 0) {
+      return res.status(400).json({ error: 'Valid year is required.' });
+    }
+    if (!Number.isFinite(gpa) || gpa <= 0 || gpa > 10) {
+      return res.status(400).json({ error: 'SGPA must be a number between 0 and 10.' });
+    }
+
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found.' });
+
+    const existing = (student.semesterMarks || []).find(
+      (m) => Number(m.semester) === sem && Number(m.year) === yr
+    );
+
+    if (!existing) {
+      student.semesterMarks.push({ semester: sem, year: yr, sgpa: gpa, subjects: [] });
+    } else {
+      existing.sgpa = gpa;
+    }
+
+    student.cgpa = recalculateCgpa(student.semesterMarks);
+    await student.save();
+
+    res.json({
+      message: 'Marks updated successfully.',
+      studentId: student.studentId,
+      semesterMarks: student.semesterMarks,
+      cgpa: student.cgpa,
+    });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get('/api/student/groups/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const groups = await Group.find({ students: studentId }).lean();
+
+    if (!groups.length) {
+      return res.json([]);
+    }
+
+    const teacherIds = [...new Set(groups.map((g) => g.teacher).filter(Boolean))];
+    const teachers = await Teacher.find({ teacherId: { $in: teacherIds } }, { teacherId: 1, name: 1 }).lean();
+    const teacherNameById = new Map(teachers.map((t) => [t.teacherId, t.name]));
+
+    const enriched = groups.map((g) => ({
+      ...g,
+      teacherName: teacherNameById.get(g.teacher) || g.teacher,
+    }));
+
+    res.json(enriched);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -518,12 +947,153 @@ app.get('/api/admin/students', async (req, res) => {
   }
 });
 
+app.get('/api/admin/teachers', async (req, res) => {
+  try {
+    const teachers = await Teacher.find({}, {
+      teacherId: 1,
+      name: 1,
+      email: 1,
+      department: 1,
+      college: 1,
+      designation: 1,
+      experience: 1,
+    });
+    res.json(teachers);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/admin/students/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const student = await Student.findOne({ studentId });
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    const allowedFields = ['name', 'email', 'college', 'department', 'year', 'semester', 'rollNumber'];
+    for (const field of allowedFields) {
+      if (field in req.body) {
+        if (field === 'email') {
+          student.email = String(req.body.email || '').trim().toLowerCase();
+        } else if (field === 'year' || field === 'semester') {
+          student[field] = Number(req.body[field]);
+        } else {
+          student[field] = req.body[field];
+        }
+      }
+    }
+
+    await student.save();
+    res.json({ message: 'Student updated successfully' });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ error: 'Duplicate value found. Email or roll number may already exist.' });
+    }
+    if (error?.name === 'ValidationError') {
+      const details = Object.values(error.errors || {}).map((e) => e.message);
+      return res.status(400).json({ error: 'Validation failed', details });
+    }
+    res.status(400).json({ error: error.message, details: error?.stack ? [error.message] : undefined });
+  }
+});
+
+app.delete('/api/admin/students/:studentId', async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const deleted = await Student.findOneAndDelete({ studentId });
+    if (!deleted) return res.status(404).json({ error: 'Student not found' });
+
+    await Group.updateMany({ students: studentId }, { $pull: { students: studentId } });
+
+    res.json({ message: 'Student deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.put('/api/admin/teachers/:teacherId', async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+    const teacher = await Teacher.findOne({ teacherId });
+    if (!teacher) return res.status(404).json({ error: 'Teacher not found' });
+
+    const allowedFields = ['name', 'email', 'college', 'department', 'designation', 'experience', 'phoneNumber'];
+    for (const field of allowedFields) {
+      if (field in req.body) {
+        if (field === 'email') {
+          teacher.email = String(req.body.email || '').trim().toLowerCase();
+        } else if (field === 'experience') {
+          teacher.experience = Number(req.body.experience) || 0;
+        } else {
+          teacher[field] = req.body[field];
+        }
+      }
+    }
+
+    await teacher.save();
+    res.json({ message: 'Teacher updated successfully' });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json({ error: 'Duplicate value found. Email may already exist.' });
+    }
+    if (error?.name === 'ValidationError') {
+      const details = Object.values(error.errors || {}).map((e) => e.message);
+      return res.status(400).json({ error: 'Validation failed', details });
+    }
+    res.status(400).json({ error: error.message, details: error?.stack ? [error.message] : undefined });
+  }
+});
+
+app.delete('/api/admin/teachers/:teacherId', async (req, res) => {
+  try {
+    const { teacherId } = req.params;
+
+    const assignedGroups = await Group.countDocuments({ teacher: teacherId });
+    if (assignedGroups > 0) {
+      return res.status(400).json({ error: 'Teacher is assigned to groups. Reassign or remove groups before deletion.' });
+    }
+
+    const deleted = await Teacher.findOneAndDelete({ teacherId });
+    if (!deleted) return res.status(404).json({ error: 'Teacher not found' });
+
+    res.json({ message: 'Teacher deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+async function getAssignedStudentIdsForTeacher(teacherId) {
+  const normalizedTeacherId = String(teacherId || '').trim();
+  if (!normalizedTeacherId) return [];
+  const teacherGroups = await Group.find({ teacher: normalizedTeacherId }, { students: 1 }).lean();
+  return [...new Set(teacherGroups.flatMap((group) => group.students || []))];
+}
+
+async function ensureTeacherCanReviewStudent(teacherId, studentId) {
+  const normalizedTeacherId = String(teacherId || '').trim();
+  if (!normalizedTeacherId) return false;
+  const assigned = await Group.exists({ teacher: normalizedTeacherId, students: studentId });
+  return Boolean(assigned);
+}
+
 // ---------------------
 // Academic certificates review (teacher)
 // ---------------------
 app.get('/api/review/academic-certificates', async (req, res) => {
   try {
-    const students = await Student.find({}, { name: 1, studentId: 1, academicCertificates: 1 }).lean();
+    const teacherId = String(req.query.teacherId || '').trim();
+    if (!teacherId) {
+      return res.status(400).json({ error: 'teacherId is required for certificate review.' });
+    }
+
+    const assignedStudentIds = await getAssignedStudentIdsForTeacher(teacherId);
+    if (assignedStudentIds.length === 0) {
+      return res.json([]);
+    }
+
+    const studentQuery = { studentId: { $in: assignedStudentIds } };
+
+    const students = await Student.find(studentQuery, { name: 1, studentId: 1, academicCertificates: 1 }).lean();
     const items = [];
 
     for (const s of students) {
@@ -565,7 +1135,18 @@ app.get('/api/review/academic-certificates', async (req, res) => {
 app.post('/api/review/academic-certificates/:studentId/:certificateId/approve', async (req, res) => {
   try {
     const { studentId, certificateId } = req.params;
-    const { feedback, teacherId, teacherName } = req.body;
+    const { feedback, teacherName } = req.body;
+    const teacherId = String(req.body.teacherId || '').trim();
+
+    if (!teacherId) {
+      return res.status(400).json({ error: 'teacherId is required to review certificates.' });
+    }
+
+    const canReview = await ensureTeacherCanReviewStudent(teacherId, studentId);
+    if (!canReview) {
+      return res.status(403).json({ error: 'You can only review certificates of students assigned to your groups.' });
+    }
+
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
@@ -629,7 +1210,18 @@ app.post('/api/review/academic-certificates/:studentId/:certificateId/approve', 
 app.post('/api/review/academic-certificates/:studentId/:certificateId/reject', async (req, res) => {
   try {
     const { studentId, certificateId } = req.params;
-    const { feedback, teacherId, teacherName } = req.body;
+    const { feedback, teacherName } = req.body;
+    const teacherId = String(req.body.teacherId || '').trim();
+
+    if (!teacherId) {
+      return res.status(400).json({ error: 'teacherId is required to review certificates.' });
+    }
+
+    const canReview = await ensureTeacherCanReviewStudent(teacherId, studentId);
+    if (!canReview) {
+      return res.status(403).json({ error: 'You can only review certificates of students assigned to your groups.' });
+    }
+
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
 
@@ -825,7 +1417,17 @@ app.get('/api/scan-status/:studentId/:certificateId', async (req, res) => {
 app.post('/api/review/academic-certificates/:studentId/:certificateId/approve-with-scan', async (req, res) => {
   try {
     const { studentId, certificateId } = req.params;
-    const { feedback, teacherId, teacherName } = req.body;
+    const { feedback, teacherName } = req.body;
+    const teacherId = String(req.body.teacherId || '').trim();
+
+    if (!teacherId) {
+      return res.status(400).json({ error: 'teacherId is required to review certificates.' });
+    }
+
+    const canReview = await ensureTeacherCanReviewStudent(teacherId, studentId);
+    if (!canReview) {
+      return res.status(403).json({ error: 'You can only review certificates of students assigned to your groups.' });
+    }
     
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -910,7 +1512,17 @@ app.post('/api/review/academic-certificates/:studentId/:certificateId/approve-wi
 app.post('/api/review/academic-certificates/:studentId/:certificateId/reject-with-scan', async (req, res) => {
   try {
     const { studentId, certificateId } = req.params;
-    const { feedback, teacherId, teacherName } = req.body;
+    const { feedback, teacherName } = req.body;
+    const teacherId = String(req.body.teacherId || '').trim();
+
+    if (!teacherId) {
+      return res.status(400).json({ error: 'teacherId is required to review certificates.' });
+    }
+
+    const canReview = await ensureTeacherCanReviewStudent(teacherId, studentId);
+    if (!canReview) {
+      return res.status(403).json({ error: 'You can only review certificates of students assigned to your groups.' });
+    }
     
     const student = await Student.findOne({ studentId });
     if (!student) return res.status(404).json({ error: 'Student not found' });
@@ -1161,8 +1773,13 @@ app.put(
         const file = req.files && req.files[field] && req.files[field][0];
         if (file) {
           student.profile[field] = toUrl(file);
-        } else if (typeof req.body[field] === "string" && req.body[field].length > 0) {
-          student.profile[field] = req.body[field];
+        } else if (field in req.body) {
+          const value = req.body[field];
+          if (value === "" || value === "__REMOVE__") {
+            student.profile[field] = null;
+          } else if (typeof value === "string" && value.length > 0) {
+            student.profile[field] = value;
+          }
         }
       }
 

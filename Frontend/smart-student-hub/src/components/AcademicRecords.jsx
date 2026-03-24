@@ -5,17 +5,48 @@ import api from '../services/api';
 const AcademicRecords = ({ studentData }) => {
   const navigate = useNavigate();
   const [fullStudentData, setFullStudentData] = useState(studentData);
+  const [loadingRecords, setLoadingRecords] = useState(true);
+  const [recordsError, setRecordsError] = useState('');
 
   useEffect(() => {
+    if (!studentData?.studentId) return;
+
     fetchFullStudentData();
-  }, []);
+    const intervalId = setInterval(fetchFullStudentData, 15000);
+    const onFocus = () => fetchFullStudentData();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [studentData?.studentId]);
 
   const fetchFullStudentData = async () => {
     try {
-      const response = await api.get(`/api/students/${studentData.studentId}`);
-      setFullStudentData(response.data);
+      setRecordsError('');
+      const [studentRes, marksRes] = await Promise.all([
+        api.get(`/api/students/${studentData.studentId}`),
+        api.get(`/api/students/${studentData.studentId}/marks`),
+      ]);
+      const marks = Array.isArray(marksRes.data?.semesterMarks) ? marksRes.data.semesterMarks : [];
+      const sortedMarks = [...marks].sort((a, b) => {
+        const ay = Number(a?.year || 0);
+        const by = Number(b?.year || 0);
+        if (ay !== by) return ay - by;
+        return Number(a?.semester || 0) - Number(b?.semester || 0);
+      });
+
+      setFullStudentData({
+        ...studentRes.data,
+        cgpa: marksRes.data?.cgpa ?? studentRes.data?.cgpa ?? null,
+        semesterMarks: sortedMarks,
+      });
     } catch (error) {
       console.error('Error fetching student data:', error);
+      setRecordsError('Unable to load academic records right now.');
+    } finally {
+      setLoadingRecords(false);
     }
   };
 
@@ -47,6 +78,18 @@ const AcademicRecords = ({ studentData }) => {
                 <p className="text-orange-600 font-medium text-lg">CGPA: {fullStudentData.cgpa || 'N/A'}</p>
               </div>
             </div>
+
+            {loadingRecords && (
+              <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
+                Loading latest academic records...
+              </div>
+            )}
+
+            {recordsError && (
+              <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                {recordsError}
+              </div>
+            )}
             
             {fullStudentData.semesterMarks?.length > 0 ? (
               <div className="grid gap-4">
