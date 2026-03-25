@@ -15,6 +15,8 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
   const [groupSearch, setGroupSearch] = useState('');
   const [groupStudentSearch, setGroupStudentSearch] = useState('');
   const [editGroupStudentSearch, setEditGroupStudentSearch] = useState('');
+  const [showAllCreateGroupStudents, setShowAllCreateGroupStudents] = useState(false);
+  const [showAllEditGroupStudents, setShowAllEditGroupStudents] = useState(false);
   const [colleges, setColleges] = useState([]);
   const [groups, setGroups] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
@@ -66,6 +68,26 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
   }, [adminData?.adminId, adminData?.institution, adminData?.department]);
 
   const normalize = (value) => String(value || '').trim().toLowerCase();
+
+  const getSearchableStudentFields = (student) => [
+    student.studentId,
+    student.name,
+    student.email,
+    student.rollNumber,
+    student.department,
+    student.college,
+    student.year,
+    student.semester,
+    student.section,
+    student.cgpa,
+    student.profile?.mobileNumber,
+    student.profile?.collegeEmail,
+  ];
+
+  const matchesStudentSearch = (student, query) => {
+    if (!query) return true;
+    return getSearchableStudentFields(student).some((value) => normalize(value).includes(query));
+  };
 
   const getBranchCode = (department) => {
     const d = normalize(department);
@@ -237,13 +259,7 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
   };
 
   const visibleStudents = studentSource.filter((student) => {
-    const matchesSearch = !studentQuery || [
-      student.studentId,
-      student.name,
-      student.email,
-      student.department,
-      student.college,
-    ].some((value) => normalize(value).includes(studentQuery));
+    const matchesSearch = matchesStudentSearch(student, studentQuery);
 
     const matchesBranch =
       selectedStudentBranch === 'ALL' || getBranchCode(student.department) === selectedStudentBranch;
@@ -276,19 +292,60 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
   });
 
   const groupStudentQuery = normalize(groupStudentSearch);
-  const visibleGroupStudents = allStudents.filter((student) => {
-    if (!groupStudentQuery) return true;
-    return [student.studentId, student.name, student.email, student.department].some((value) =>
-      normalize(value).includes(groupStudentQuery)
+  const hasAdminScope = Boolean(adminData?.institution && adminData?.department);
+
+  const scopedCreateGroupTeachers = allTeachers.filter((teacher) => {
+    if (!hasAdminScope) return true;
+    return (
+      normalize(teacher.college) === normalize(adminData.institution) &&
+      normalize(teacher.department) === normalize(adminData.department)
     );
   });
 
+  const eligibleCreateGroupStudents =
+    allStudents.length > 0
+      ? allStudents
+      : students;
+
+  const eligibleCreateGroupTeachers =
+    scopedCreateGroupTeachers.length > 0
+      ? scopedCreateGroupTeachers
+      : (teachers.length > 0 ? teachers : allTeachers);
+
+  const visibleGroupStudents = eligibleCreateGroupStudents.filter((student) => {
+    return matchesStudentSearch(student, groupStudentQuery);
+  });
+
   const editGroupStudentQuery = normalize(editGroupStudentSearch);
-  const visibleEditGroupStudents = allStudents.filter((student) => {
-    if (!editGroupStudentQuery) return true;
-    return [student.studentId, student.name, student.email, student.department].some((value) =>
-      normalize(value).includes(editGroupStudentQuery)
+  const selectedEditGroup = groups.find((group) => group._id === editingGroup);
+  const scopedEditGroupStudents = allStudents.filter((student) => {
+    if (!selectedEditGroup) return true;
+    return (
+      normalize(student.college) === normalize(selectedEditGroup.college) &&
+      normalize(student.department) === normalize(selectedEditGroup.department)
     );
+  });
+
+  const scopedEditGroupTeachers = allTeachers.filter((teacher) => {
+    if (!selectedEditGroup) return true;
+    return (
+      normalize(teacher.college) === normalize(selectedEditGroup.college) &&
+      normalize(teacher.department) === normalize(selectedEditGroup.department)
+    );
+  });
+
+  const eligibleEditGroupStudents =
+    allStudents.length > 0
+      ? allStudents
+      : students;
+
+  const eligibleEditGroupTeachers =
+    scopedEditGroupTeachers.length > 0
+      ? scopedEditGroupTeachers
+      : (teachers.length > 0 ? teachers : allTeachers);
+
+  const visibleEditGroupStudents = eligibleEditGroupStudents.filter((student) => {
+    return matchesStudentSearch(student, editGroupStudentQuery);
   });
 
   const getTeacherDisplayName = (teacherId) => {
@@ -875,23 +932,32 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                 <form onSubmit={async (e) => {
                   e.preventDefault();
                   try {
-                    console.log('Admin data:', adminData);
+                    if (!adminData?.adminId || !adminData?.institution || !adminData?.department) {
+                      alert('Admin scope is missing. Please re-login and try again.');
+                      return;
+                    }
+
                     const groupData = {
-                      name: groupForm.name,
-                      college: adminData.institution || 'Test College',
-                      department: adminData.department || 'Test Department',
+                      name: String(groupForm.name || '').trim(),
+                      college: String(adminData.institution || '').trim(),
+                      department: String(adminData.department || '').trim(),
                       teacher: groupForm.teacher,
                       students: groupForm.students,
                       createdBy: adminData.adminId
                     };
-                    console.log('Creating group:', groupData);
+
+                    if (!groupData.name || !groupData.teacher) {
+                      alert('Group name and teacher are required.');
+                      return;
+                    }
+
                     const response = await api.post('/api/groups', groupData);
-                    console.log('Group created:', response.data);
                     setGroupForm({ name: '', teacher: '', students: [] });
                     setGroupStudentSearch('');
+                    setShowAllCreateGroupStudents(false);
                     setSelectedStudentGroup(response.data._id || 'ALL');
                     setLastGroupCreated(response.data);
-                    fetchData();
+                    await fetchData();
                   } catch (error) {
                     console.error('Group creation error:', error);
                     alert('Error creating group: ' + (error.response?.data?.error || error.message));
@@ -914,36 +980,60 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                     <select
                       value={groupForm.teacher}
                       onChange={(e) => setGroupForm({...groupForm, teacher: e.target.value})}
-                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-white/50 border-gray-200 text-gray-900'}`}
+                      className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm ${dark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white/50 border-gray-200 text-gray-900'}`}
                       required
                     >
                       <option value="">Select Teacher</option>
-                      {teachers.map((teacher) => (
+                      {eligibleCreateGroupTeachers.map((teacher) => (
                         <option key={teacher.teacherId} value={teacher.teacherId}>
                           {teacher.name} ({teacher.department || 'No Branch'})
                         </option>
                       ))}
                     </select>
+                    {eligibleCreateGroupTeachers.length === 0 && (
+                      <p className={`mt-2 text-xs ${dark ? 'text-amber-300' : 'text-amber-700'}`}>
+                        No teachers available. Please add teachers first or update admin scope.
+                      </p>
+                    )}
                   </div>
                   
                   <div>
                     <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Select Students</label>
-                    <div className="relative mb-3">
-                      <input
-                        type="text"
-                        value={groupStudentSearch}
-                        onChange={(e) => setGroupStudentSearch(e.target.value)}
-                        placeholder="Search students to add..."
-                        className={`w-full px-4 py-2.5 pl-10 border rounded-xl transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-purple-400/50' : 'bg-white/80 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-purple-500'} focus:outline-none focus:ring-2 focus:ring-purple-500/30`}
-                      />
-                      <svg className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
-                      </svg>
+                    <div className="mb-3 flex flex-col sm:flex-row gap-2">
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={groupStudentSearch}
+                          onChange={(e) => setGroupStudentSearch(e.target.value)}
+                          placeholder="Search all students by ID, name, email, roll number, college, department, year..."
+                          className={`w-full px-4 py-2.5 pl-10 border rounded-xl transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-purple-400/50' : 'bg-white/80 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-purple-500'} focus:outline-none focus:ring-2 focus:ring-purple-500/30`}
+                        />
+                        <svg className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                        </svg>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (showAllCreateGroupStudents) {
+                            setShowAllCreateGroupStudents(false);
+                          } else {
+                            setGroupStudentSearch('');
+                            setShowAllCreateGroupStudents(true);
+                          }
+                        }}
+                        className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-gray-200 hover:bg-white/10' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        {showAllCreateGroupStudents ? 'Close View' : 'View All'}
+                      </button>
                     </div>
-                    <div className={`max-h-48 overflow-y-auto backdrop-blur-sm border rounded-xl p-4 ${dark ? 'bg-white/5 border-white/10' : 'bg-gray-50/50 border-gray-200'}`}>
-                      <div className="space-y-2">
+                    <p className={`text-xs mb-3 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Showing {visibleGroupStudents.length} of {eligibleCreateGroupStudents.length} students | Selected {groupForm.students.length}
+                    </p>
+                    <div className={`${showAllCreateGroupStudents ? 'max-h-none overflow-visible' : 'max-h-48 overflow-y-auto'} backdrop-blur-sm border rounded-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-gray-50/50 border-gray-200'}`}>
+                      <div className={`divide-y ${dark ? 'divide-white/10' : 'divide-gray-200'}`}>
                         {visibleGroupStudents.map((student) => (
-                          <label key={student.studentId} className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${dark ? 'hover:bg-white/5' : 'hover:bg-white/50'}`}>
+                          <label key={student.studentId} className={`flex items-start space-x-3 px-4 py-3 transition-colors duration-150 cursor-pointer ${dark ? 'hover:bg-white/8' : 'hover:bg-white/70'}`}>
                             <input
                               type="checkbox"
                               checked={groupForm.students.includes(student.studentId)}
@@ -961,11 +1051,24 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
                               <span className="text-white text-xs font-bold">{student.name?.charAt(0)}</span>
                             </div>
-                            <span className={`text-sm font-medium ${dark ? 'text-gray-300' : 'text-gray-700'}`}>{student.name} ({student.studentId})</span>
+                            <div className="min-w-0 flex-1">
+                              <p className={`text-sm font-medium truncate ${dark ? 'text-gray-300' : 'text-gray-700'}`}>
+                                {student.name} ({student.studentId})
+                              </p>
+                              <p className={`text-xs truncate ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
+                                {student.email || 'No email'} | Roll: {student.rollNumber || 'N/A'}
+                              </p>
+                              <p className={`text-xs truncate ${dark ? 'text-gray-500' : 'text-gray-500'}`}>
+                                {student.department || 'N/A'} | {student.college || 'N/A'}
+                              </p>
+                              <p className={`text-xs ${dark ? 'text-gray-500' : 'text-gray-500'}`}>
+                                Year {student.year || 'N/A'} | Semester {student.semester || 'N/A'}
+                              </p>
+                            </div>
                           </label>
                         ))}
                         {visibleGroupStudents.length === 0 && (
-                          <p className={`text-sm py-2 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>No students found for this search.</p>
+                          <p className={`text-sm px-4 py-3 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>No students found for this search.</p>
                         )}
                       </div>
                     </div>
@@ -973,7 +1076,7 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                   
                   <button 
                     type="submit" 
-                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                    className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white font-semibold py-3 px-6 rounded-xl"
                   >
                     <svg className="w-5 h-5 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd"/>
@@ -998,9 +1101,9 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                   </div>
                 </div>
                 
-                <div className="space-y-4">
+                <div className={`divide-y ${dark ? 'divide-white/10' : 'divide-gray-200'}`}>
                   {visibleGroups.map((group) => (
-                    <div key={group._id} className={`backdrop-blur-sm border rounded-xl p-6 hover:shadow-lg transition-all duration-200 ${dark ? 'bg-white/[0.03] border-white/10' : 'bg-gradient-to-r from-white/60 to-gray-50/60 border-gray-200/50'}`}>
+                    <div key={group._id} className={`py-5 ${dark ? 'bg-transparent' : 'bg-transparent'}`}>
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <div className="flex items-center mb-3">
@@ -1050,8 +1153,9 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                                 students: group.students
                               });
                               setEditGroupStudentSearch('');
+                              setShowAllEditGroupStudents(false);
                             }}
-                            className="bg-gradient-to-r from-blue-500 to-indigo-500 hover:from-blue-600 hover:to-indigo-600 text-white px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center space-x-2"
+                            className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2"
                           >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                               <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
@@ -1069,7 +1173,7 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                                 alert(getApiErrorMessage(error, 'Failed to delete group'));
                               }
                             }}
-                            className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 flex items-center space-x-2"
+                            className="bg-gradient-to-r from-red-500 to-pink-500 text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2"
                           >
                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2h.293l.91 10.11A2 2 0 007.196 18h5.608a2 2 0 001.993-1.89L15.707 6H16a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zm-1 4a1 1 0 012 0v8a1 1 0 11-2 0V6zm4-1a1 1 0 00-1 1v8a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"/>
@@ -1232,36 +1336,60 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                 <select
                   value={editForm.teacher}
                   onChange={(e) => setEditForm({...editForm, teacher: e.target.value})}
-                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm ${dark ? 'bg-white/5 border-white/10 text-white' : 'bg-white/50 border-gray-200 text-gray-900'}`}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm ${dark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white/50 border-gray-200 text-gray-900'}`}
                   required
                 >
                   <option value="">Select Teacher</option>
-                  {teachers.map((teacher) => (
+                  {eligibleEditGroupTeachers.map((teacher) => (
                     <option key={teacher.teacherId} value={teacher.teacherId}>
                       {teacher.name} ({teacher.department || 'No Branch'})
                     </option>
                   ))}
                 </select>
+                {eligibleEditGroupTeachers.length === 0 && (
+                  <p className={`mt-2 text-xs ${dark ? 'text-amber-300' : 'text-amber-700'}`}>
+                    No matching teachers available for this group scope.
+                  </p>
+                )}
               </div>
               
               <div>
                 <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Select Students</label>
-                <div className="relative mb-3">
-                  <input
-                    type="text"
-                    value={editGroupStudentSearch}
-                    onChange={(e) => setEditGroupStudentSearch(e.target.value)}
-                    placeholder="Search students to add..."
-                    className={`w-full px-4 py-2.5 pl-10 border rounded-xl transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-blue-400/50' : 'bg-white/80 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-500'} focus:outline-none focus:ring-2 focus:ring-blue-500/30`}
-                  />
-                  <svg className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
-                  </svg>
+                <div className="mb-3 flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      value={editGroupStudentSearch}
+                      onChange={(e) => setEditGroupStudentSearch(e.target.value)}
+                      placeholder="Search all students by ID, name, email, roll number, college, department, year..."
+                      className={`w-full px-4 py-2.5 pl-10 border rounded-xl transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-white placeholder-gray-500 focus:border-blue-400/50' : 'bg-white/80 border-gray-200 text-gray-800 placeholder-gray-400 focus:border-blue-500'} focus:outline-none focus:ring-2 focus:ring-blue-500/30`}
+                    />
+                    <svg className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-gray-500' : 'text-gray-400'}`} fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd"/>
+                    </svg>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (showAllEditGroupStudents) {
+                        setShowAllEditGroupStudents(false);
+                      } else {
+                        setEditGroupStudentSearch('');
+                        setShowAllEditGroupStudents(true);
+                      }
+                    }}
+                    className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 text-gray-200 hover:bg-white/10' : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                  >
+                    {showAllEditGroupStudents ? 'Close View' : 'View All'}
+                  </button>
                 </div>
-                <div className={`max-h-48 overflow-y-auto backdrop-blur-sm border rounded-xl p-4 ${dark ? 'bg-white/5 border-white/10' : 'bg-gray-50/50 border-gray-200'}`}>
-                  <div className="space-y-2">
+                <p className={`text-xs mb-3 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Showing {visibleEditGroupStudents.length} of {eligibleEditGroupStudents.length} students | Selected {editForm.students.length}
+                </p>
+                <div className={`${showAllEditGroupStudents ? 'max-h-none overflow-visible' : 'max-h-48 overflow-y-auto'} backdrop-blur-sm border rounded-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-gray-50/50 border-gray-200'}`}>
+                  <div className={`divide-y ${dark ? 'divide-white/10' : 'divide-gray-200'}`}>
                     {visibleEditGroupStudents.map((student) => (
-                      <label key={student.studentId} className={`flex items-center space-x-3 p-2 rounded-lg transition-colors duration-200 cursor-pointer ${dark ? 'hover:bg-white/5' : 'hover:bg-white/50'}`}>
+                      <label key={student.studentId} className={`flex items-start space-x-3 px-4 py-3 transition-colors duration-150 cursor-pointer ${dark ? 'hover:bg-white/8' : 'hover:bg-white/70'}`}>
                         <input
                           type="checkbox"
                           checked={editForm.students.includes(student.studentId)}
@@ -1279,11 +1407,24 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                         <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-full flex items-center justify-center">
                           <span className="text-white text-xs font-bold">{student.name?.charAt(0)}</span>
                         </div>
-                        <span className={`text-sm font-medium ${dark ? 'text-gray-300' : 'text-gray-700'}`}>{student.name} ({student.studentId})</span>
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-sm font-medium truncate ${dark ? 'text-gray-300' : 'text-gray-700'}`}>
+                            {student.name} ({student.studentId})
+                          </p>
+                          <p className={`text-xs truncate ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
+                            {student.email || 'No email'} | Roll: {student.rollNumber || 'N/A'}
+                          </p>
+                          <p className={`text-xs truncate ${dark ? 'text-gray-500' : 'text-gray-500'}`}>
+                            {student.department || 'N/A'} | {student.college || 'N/A'}
+                          </p>
+                          <p className={`text-xs ${dark ? 'text-gray-500' : 'text-gray-500'}`}>
+                            Year {student.year || 'N/A'} | Semester {student.semester || 'N/A'}
+                          </p>
+                        </div>
                       </label>
                     ))}
                     {visibleEditGroupStudents.length === 0 && (
-                      <p className={`text-sm py-2 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>No students found for this search.</p>
+                      <p className={`text-sm px-4 py-3 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>No students found for this search.</p>
                     )}
                   </div>
                 </div>

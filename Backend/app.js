@@ -636,6 +636,8 @@ app.delete("/api/academic-certificates/:studentId/:certificateId", async (req, r
 app.post('/api/groups', async (req, res) => {
   try {
     const { name, college, department, teacher, students, createdBy } = req.body;
+    const normalizedCollege = String(college || '').trim();
+    const normalizedDepartment = String(department || '').trim();
 
     if (!name || !college || !department || !teacher || !createdBy) {
       return res.status(400).json({ error: 'Name, college, department, teacher, and createdBy are required' });
@@ -646,18 +648,38 @@ app.post('/api/groups', async (req, res) => {
       return res.status(404).json({ error: 'Selected teacher not found' });
     }
 
+    if (
+      String(teacherExists.college || '').trim().toLowerCase() !== normalizedCollege.toLowerCase() ||
+      String(teacherExists.department || '').trim().toLowerCase() !== normalizedDepartment.toLowerCase()
+    ) {
+      return res.status(400).json({ error: 'Selected teacher does not belong to the selected college/department' });
+    }
+
     const studentIds = Array.isArray(students) ? students : [];
     if (studentIds.length > 0) {
-      const validStudents = await Student.countDocuments({ studentId: { $in: studentIds } });
-      if (validStudents !== studentIds.length) {
+      const matchedStudents = await Student.find(
+        { studentId: { $in: studentIds } },
+        { studentId: 1, college: 1, department: 1 }
+      ).lean();
+      if (matchedStudents.length !== studentIds.length) {
         return res.status(400).json({ error: 'One or more selected students are invalid' });
+      }
+
+      const allInScope = matchedStudents.every(
+        (student) =>
+          String(student.college || '').trim().toLowerCase() === normalizedCollege.toLowerCase() &&
+          String(student.department || '').trim().toLowerCase() === normalizedDepartment.toLowerCase()
+      );
+
+      if (!allInScope) {
+        return res.status(400).json({ error: 'Selected students must belong to the selected college/department' });
       }
     }
 
     const group = new Group({
       name: String(name).trim(),
-      college: String(college).trim(),
-      department: String(department).trim(),
+      college: normalizedCollege,
+      department: normalizedDepartment,
       teacher,
       students: studentIds,
       createdBy,
@@ -695,15 +717,36 @@ app.put('/api/groups/:groupId', async (req, res) => {
       if (!teacherExists) {
         return res.status(404).json({ error: 'Selected teacher not found' });
       }
+
+      if (
+        String(teacherExists.college || '').trim().toLowerCase() !== String(group.college || '').trim().toLowerCase() ||
+        String(teacherExists.department || '').trim().toLowerCase() !== String(group.department || '').trim().toLowerCase()
+      ) {
+        return res.status(400).json({ error: 'Selected teacher does not belong to this group college/department' });
+      }
+
       group.teacher = teacher;
     }
 
     if (students !== undefined) {
       const studentIds = Array.isArray(students) ? students : [];
       if (studentIds.length > 0) {
-        const validStudents = await Student.countDocuments({ studentId: { $in: studentIds } });
-        if (validStudents !== studentIds.length) {
+        const matchedStudents = await Student.find(
+          { studentId: { $in: studentIds } },
+          { studentId: 1, college: 1, department: 1 }
+        ).lean();
+        if (matchedStudents.length !== studentIds.length) {
           return res.status(400).json({ error: 'One or more selected students are invalid' });
+        }
+
+        const allInScope = matchedStudents.every(
+          (student) =>
+            String(student.college || '').trim().toLowerCase() === String(group.college || '').trim().toLowerCase() &&
+            String(student.department || '').trim().toLowerCase() === String(group.department || '').trim().toLowerCase()
+        );
+
+        if (!allInScope) {
+          return res.status(400).json({ error: 'Selected students must belong to this group college/department' });
         }
       }
       group.students = studentIds;
@@ -730,8 +773,14 @@ app.delete('/api/groups/:groupId', async (req, res) => {
 app.get('/api/teacher/groups/:teacherId', async (req, res) => {
   try {
     const { teacherId } = req.params;
-    const groups = await Group.find({ teacher: teacherId });
-    res.json(groups);
+    const groups = await Group.find({ teacher: teacherId }).sort({ updatedAt: -1 }).lean();
+
+    const enriched = groups.map((group) => ({
+      ...group,
+      studentCount: Array.isArray(group.students) ? group.students.length : 0,
+    }));
+
+    res.json(enriched);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
@@ -761,9 +810,12 @@ app.get('/api/teacher/students/:teacherId', async (req, res) => {
 
     const enriched = students.map((student) => {
       const { password, __v, ...safeStudent } = student;
+      const studentGroupNames = Array.from(groupNamesByStudentId.get(student.studentId) || []);
       return {
         ...safeStudent,
-        groupName: Array.from(groupNamesByStudentId.get(student.studentId) || []).join(', '),
+        groupName: studentGroupNames.join(', '),
+        groups: studentGroupNames,
+        groupCount: studentGroupNames.length,
       };
     });
 
@@ -905,19 +957,25 @@ app.put('/api/teacher/marks/:studentId', async (req, res) => {
 app.get('/api/student/groups/:studentId', async (req, res) => {
   try {
     const { studentId } = req.params;
-    const groups = await Group.find({ students: studentId }).lean();
+    const groups = await Group.find({ students: studentId }).sort({ updatedAt: -1 }).lean();
 
     if (!groups.length) {
       return res.json([]);
     }
 
     const teacherIds = [...new Set(groups.map((g) => g.teacher).filter(Boolean))];
-    const teachers = await Teacher.find({ teacherId: { $in: teacherIds } }, { teacherId: 1, name: 1 }).lean();
-    const teacherNameById = new Map(teachers.map((t) => [t.teacherId, t.name]));
+    const teachers = await Teacher.find(
+      { teacherId: { $in: teacherIds } },
+      { teacherId: 1, name: 1, email: 1, designation: 1 }
+    ).lean();
+    const teacherById = new Map(teachers.map((t) => [t.teacherId, t]));
 
     const enriched = groups.map((g) => ({
       ...g,
-      teacherName: teacherNameById.get(g.teacher) || g.teacher,
+      teacherName: teacherById.get(g.teacher)?.name || g.teacher,
+      teacherEmail: teacherById.get(g.teacher)?.email || null,
+      teacherDesignation: teacherById.get(g.teacher)?.designation || null,
+      studentCount: Array.isArray(g.students) ? g.students.length : 0,
     }));
 
     res.json(enriched);
@@ -939,7 +997,12 @@ app.get('/api/admin/students', async (req, res) => {
       department: 1, 
       year: 1, 
       semester: 1, 
-      rollNumber: 1 
+      rollNumber: 1,
+      section: 1,
+      cgpa: 1,
+      'profile.profileImage': 1,
+      'profile.mobileNumber': 1,
+      'profile.collegeEmail': 1,
     });
     res.json(students);
   } catch (error) {

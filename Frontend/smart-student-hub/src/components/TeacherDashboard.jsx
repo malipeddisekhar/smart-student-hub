@@ -488,7 +488,7 @@ const TeacherDashboard = ({ teacherData, onLogout, onTeacherUpdate }) => {
                           <div>
                             <h4 className="font-semibold text-lg">{group.name}</h4>
                             <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>
-                              Students: {group.students.length}
+                              Students: {group.studentCount ?? group.students?.length ?? 0}
                             </p>
                           </div>
                           <button
@@ -540,6 +540,12 @@ const TeacherDashboard = ({ teacherData, onLogout, onTeacherUpdate }) => {
                               <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                                 {student.groupName}
                               </span>
+                            </div>
+
+                            <div className="mb-4">
+                              <p className={`text-xs font-medium ${dark ? "text-gray-400" : "text-gray-500"}`}>
+                                Assigned Groups: {student.groupCount ?? student.groups?.length ?? 0}
+                              </p>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">

@@ -87,17 +87,7 @@ const Dashboard = ({ studentData, onLogout }) => {
     }
 
     try {
-      const [
-        messagesRes,
-        unreadMessagesRes,
-        notifRes,
-        unreadNotifRes,
-        profileRes,
-        projectsRes,
-        certsRes,
-        marksRes,
-        groupsRes,
-      ] = await Promise.all([
+      const results = await Promise.allSettled([
         api.get(`/api/messages/student/${studentData.studentId}`),
         api.get(`/api/messages/unread-count/${studentData.studentId}`),
         api.get(`/api/notifications/${studentData.studentId}`),
@@ -109,17 +99,30 @@ const Dashboard = ({ studentData, onLogout }) => {
         api.get(`/api/student/groups/${studentData.studentId}`),
       ]);
 
-      setMessages(Array.isArray(messagesRes.data) ? messagesRes.data : []);
-      setUnreadCount(unreadMessagesRes.data?.unreadCount || 0);
-      setNotifications(Array.isArray(notifRes.data) ? notifRes.data : []);
-      setUnreadNotifCount(unreadNotifRes.data?.unreadCount || 0);
-      setProfileData(profileRes.data || {});
-      setStudentGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
+      const pickData = (index, fallback) =>
+        results[index]?.status === 'fulfilled' ? results[index].value?.data : fallback;
+
+      const messagesData = pickData(0, []);
+      const unreadMessagesData = pickData(1, {});
+      const notificationsData = pickData(2, []);
+      const unreadNotificationsData = pickData(3, {});
+      const profileDataResponse = pickData(4, {});
+      const projectsData = pickData(5, []);
+      const certificatesData = pickData(6, []);
+      const marksData = pickData(7, {});
+      const groupsData = pickData(8, []);
+
+      setMessages(Array.isArray(messagesData) ? messagesData : []);
+      setUnreadCount(unreadMessagesData?.unreadCount || 0);
+      setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
+      setUnreadNotifCount(unreadNotificationsData?.unreadCount || 0);
+      setProfileData(profileDataResponse || {});
+      setStudentGroups(Array.isArray(groupsData) ? groupsData : []);
       setDashboardStats({
-        cgpa: marksRes.data?.cgpa ?? null,
-        projectCount: Array.isArray(projectsRes.data) ? projectsRes.data.length : 0,
-        certificateCount: Array.isArray(certsRes.data) ? certsRes.data.length : 0,
-        semesterCount: Array.isArray(marksRes.data?.semesterMarks) ? marksRes.data.semesterMarks.length : 0,
+        cgpa: marksData?.cgpa ?? null,
+        projectCount: Array.isArray(projectsData) ? projectsData.length : 0,
+        certificateCount: Array.isArray(certificatesData) ? certificatesData.length : 0,
+        semesterCount: Array.isArray(marksData?.semesterMarks) ? marksData.semesterMarks.length : 0,
       });
       setLastSyncedAt(new Date());
     } catch (error) {
@@ -571,6 +574,11 @@ const Dashboard = ({ studentData, onLogout }) => {
                   ? studentGroups.slice(0, 2).map((g) => g.name).join(', ')
                   : 'No groups assigned yet'}
               </p>
+              {studentGroups.length > 0 && (
+                <p className={`text-xs mt-2 ${dark ? "text-blue-300" : "text-blue-700"}`}>
+                  Mentors: {Array.from(new Set(studentGroups.map((g) => g.teacherName).filter(Boolean))).slice(0, 3).join(', ')}
+                </p>
+              )}
             </div>
           </motion.div>
 

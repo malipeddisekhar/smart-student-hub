@@ -108,93 +108,6 @@ const LandingPage = () => {
               </h1>
             </motion.div>
 
-            {/* Search Bar */}
-            <div className="flex-1 max-w-md mx-8 relative" ref={searchRef}>
-              <div className="relative">
-                <input
-                  type="text"
-                  placeholder="Search student details..."
-                  value={searchQuery}
-                  onChange={handleInputChange}
-                  onKeyPress={handleKeyPress}
-                  className="w-full px-4 py-2 pl-10 pr-4 bg-white/80 border border-blue-100 rounded-xl text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300 backdrop-blur-sm text-sm"
-                />
-                <svg
-                  className="absolute left-3 top-2.5 h-5 w-5 text-slate-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-                {isSearching && (
-                  <div className="absolute right-3 top-2.5">
-                    <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-400 border-t-transparent"></div>
-                  </div>
-                )}
-              </div>
-
-              {/* Search Results Dropdown */}
-              {showResults && (
-                <div className="absolute top-full left-0 right-0 mt-2 glass rounded-2xl shadow-2xl z-50 max-h-96 overflow-y-auto animate-fadeInDown">
-                  {searchResults.length > 0 ? (
-                    searchResults.map((student) => (
-                      <div
-                        key={student._id}
-                        className="p-4 border-b border-gray-100/60 hover:bg-blue-50/60 cursor-pointer transition-all duration-200"
-                        onClick={() => {
-                          navigate(`/student/${student.studentId}`);
-                          setShowResults(false);
-                          setSearchQuery("");
-                        }}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="flex-shrink-0">
-                            {student.profile?.profileImage ? (
-                              <img
-                                src={student.profile.profileImage}
-                                alt={student.name}
-                                className="w-12 h-12 rounded-xl object-cover ring-2 ring-indigo-100"
-                              />
-                            ) : (
-                              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-blue-400 rounded-xl flex items-center justify-center shadow-md">
-                                <span className="text-white font-semibold text-lg">
-                                  {student.name.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 truncate">
-                              {student.name}
-                            </p>
-                            <p className="text-xs text-gray-500 truncate">
-                              {student.studentId} • {student.department}, {student.college}
-                            </p>
-                            <p className="text-xs text-gray-400">
-                              Year {student.year} • CGPA: {student.cgpa || "N/A"}
-                            </p>
-                          </div>
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                            Sem {student.semester}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-gray-500 text-sm">
-                      No students found matching "{searchQuery}"
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* Login Buttons */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
@@ -248,7 +161,7 @@ const LandingPage = () => {
                 style={{ fontFamily: "Poppins, Inter, system-ui, -apple-system, sans-serif" }}
               >
                 Centralized Digital Platform for
-                <span className="block mt-2 hero-highlight-text">Student Excellence</span>
+                <span className="block mt-2 hero-highlight-text">Smart Student Hub</span>
               </motion.h1>
 
               <motion.p
