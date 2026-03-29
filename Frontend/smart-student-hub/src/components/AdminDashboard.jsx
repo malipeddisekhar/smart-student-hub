@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -15,14 +15,16 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
   const [groupSearch, setGroupSearch] = useState('');
   const [groupStudentSearch, setGroupStudentSearch] = useState('');
   const [editGroupStudentSearch, setEditGroupStudentSearch] = useState('');
+  const [groupFormYearFilter, setGroupFormYearFilter] = useState('ALL');
+  const [editFormYearFilter, setEditFormYearFilter] = useState('ALL');
   const [showAllCreateGroupStudents, setShowAllCreateGroupStudents] = useState(false);
   const [showAllEditGroupStudents, setShowAllEditGroupStudents] = useState(false);
   const [colleges, setColleges] = useState([]);
   const [groups, setGroups] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
-  const [groupForm, setGroupForm] = useState({ name: '', teacher: '', students: [] });
+  const [groupForm, setGroupForm] = useState({ name: '', college: 'gmrit', department: '', teacher: '', students: [] });
   const [editingGroup, setEditingGroup] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', teacher: '', students: [] });
+  const [editForm, setEditForm] = useState({ name: '', college: 'gmrit', department: '', teacher: '', students: [] });
   const [showAdminEditModal, setShowAdminEditModal] = useState(false);
   const [savingAdminProfile, setSavingAdminProfile] = useState(false);
   const [showAllStudents, setShowAllStudents] = useState(true);
@@ -31,6 +33,8 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
   const [lastGroupCreated, setLastGroupCreated] = useState(null);
   const [teacherDetailsForStudents, setTeacherDetailsForStudents] = useState(null);
   const [showTeacherStudentModal, setShowTeacherStudentModal] = useState(false);
+  const [facultyFilterCollege, setFacultyFilterCollege] = useState('gmrit');
+  const [facultyFilterDepartment, setFacultyFilterDepartment] = useState('ALL');
   const [adminProfileForm, setAdminProfileForm] = useState({
     name: '',
     email: '',
@@ -41,6 +45,7 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
   const [dark, setDark] = useState(() => {
     try { return JSON.parse(localStorage.getItem('admin-dark-mode')) ?? true; } catch { return true; }
   });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   useEffect(() => { localStorage.setItem('admin-dark-mode', JSON.stringify(dark)); }, [dark]);
 
   useEffect(() => {
@@ -67,9 +72,9 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
     };
   }, [adminData?.adminId, adminData?.institution, adminData?.department]);
 
-  const normalize = (value) => String(value || '').trim().toLowerCase();
+  const normalize = useCallback((value) => String(value || '').trim().toLowerCase(), []);
 
-  const getSearchableStudentFields = (student) => [
+  const getSearchableStudentFields = useCallback((student) => [
     student.studentId,
     student.name,
     student.email,
@@ -82,14 +87,15 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
     student.cgpa,
     student.profile?.mobileNumber,
     student.profile?.collegeEmail,
-  ];
+  ], []);
 
-  const matchesStudentSearch = (student, query) => {
+  const matchesStudentSearch = useCallback((student, query) => {
     if (!query) return true;
-    return getSearchableStudentFields(student).some((value) => normalize(value).includes(query));
-  };
+    const fields = getSearchableStudentFields(student);
+    return fields.some((value) => normalize(value).includes(query));
+  }, [getSearchableStudentFields, normalize]);
 
-  const getBranchCode = (department) => {
+  const getBranchCode = useCallback((department) => {
     const d = normalize(department);
     if (d.includes('aiml') || d.includes('ai ml') || d.includes('artificial intelligence')) return 'AIML';
     if (d.includes('aids') || d.includes('ai ds') || d.includes('data science')) return 'AIDS';
@@ -99,7 +105,118 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
     if (d.includes('ece') || d.includes('electronics')) return 'ECE';
     if (d === 'it' || d.includes('information technology')) return 'IT';
     return 'OTHER';
-  };
+  }, [normalize]);
+
+  const facultyColleges = useMemo(() => {
+    return ['gmrit'];
+  }, []);
+
+  const facultyDepartments = useMemo(() => {
+    let departments = new Map();
+    const filteredTeachers = facultyFilterCollege === 'ALL'
+      ? allTeachers
+      : allTeachers.filter(t => normalize(t.college) === normalize(facultyFilterCollege));
+    
+    filteredTeachers.forEach(teacher => {
+      if (teacher.department) {
+        const upperDept = String(teacher.department).trim().toUpperCase();
+        if (!departments.has(upperDept)) {
+          departments.set(upperDept, upperDept);
+        }
+      }
+    });
+    return Array.from(departments.values()).sort();
+  }, [allTeachers, facultyFilterCollege, normalize]);
+
+  const groupFormDepartments = useMemo(() => {
+    if (!groupForm.college) return [];
+    
+    const deptMap = new Map();
+    
+    // Get departments from students
+    allStudents.forEach(student => {
+      if (student.college && student.department) {
+        if (normalize(student.college) === normalize(groupForm.college)) {
+          const upperDept = String(student.department).trim().toUpperCase();
+          if (!deptMap.has(upperDept)) {
+            deptMap.set(upperDept, upperDept);
+          }
+        }
+      }
+    });
+    
+    // Get departments from teachers
+    allTeachers.forEach(teacher => {
+      if (teacher.college && teacher.department) {
+        if (normalize(teacher.college) === normalize(groupForm.college)) {
+          const upperDept = String(teacher.department).trim().toUpperCase();
+          if (!deptMap.has(upperDept)) {
+            deptMap.set(upperDept, upperDept);
+          }
+        }
+      }
+    });
+    
+    return Array.from(deptMap.values()).sort();
+  }, [groupForm.college, allStudents, allTeachers, normalize]);
+
+  const editFormDepartments = useMemo(() => {
+    if (!editForm.college) return [];
+    
+    const deptMap = new Map();
+    
+    // Get departments from students
+    allStudents.forEach(student => {
+      if (student.college && student.department) {
+        if (normalize(student.college) === normalize(editForm.college)) {
+          const upperDept = String(student.department).trim().toUpperCase();
+          if (!deptMap.has(upperDept)) {
+            deptMap.set(upperDept, upperDept);
+          }
+        }
+      }
+    });
+    
+    // Get departments from teachers
+    allTeachers.forEach(teacher => {
+      if (teacher.college && teacher.department) {
+        if (normalize(teacher.college) === normalize(editForm.college)) {
+          const upperDept = String(teacher.department).trim().toUpperCase();
+          if (!deptMap.has(upperDept)) {
+            deptMap.set(upperDept, upperDept);
+          }
+        }
+      }
+    });
+    
+    return Array.from(deptMap.values()).sort();
+  }, [editForm.college, allStudents, allTeachers, normalize]);
+
+  const allAvailableDepartments = useMemo(() => {
+    const deptMap = new Map();
+    
+    // Get ALL departments from students
+    allStudents.forEach(student => {
+      if (student.department) {
+        const upperDept = String(student.department).trim().toUpperCase();
+        if (!deptMap.has(upperDept)) {
+          deptMap.set(upperDept, upperDept);
+        }
+      }
+    });
+    
+    // Get ALL departments from teachers
+    allTeachers.forEach(teacher => {
+      if (teacher.department) {
+        const upperDept = String(teacher.department).trim().toUpperCase();
+        if (!deptMap.has(upperDept)) {
+          deptMap.set(upperDept, upperDept);
+        }
+      }
+    });
+    
+    return Array.from(deptMap.values()).sort();
+  }, [allStudents, allTeachers, normalize]);
 
   useEffect(() => {
     setAdminProfileForm({
@@ -160,7 +277,23 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
       // If admin scope labels don't match dataset labels, show all data instead of blank tables.
       setStudents(hasAdminScope && filteredStudents.length === 0 ? allStudents : filteredStudents);
       setTeachers(hasAdminScope && filteredTeachers.length === 0 ? allTeachers : filteredTeachers);
-      setColleges(collegesRes.data);
+      
+      // Filter colleges to only include gmrit
+      // (standardize all variations like GMRIT, GMR INSTITUTE OF TECHNOLOGY, etc.)
+      const collegeSet = new Set();
+      allStudents.forEach(s => {
+        if (s.college) {
+          collegeSet.add('gmrit');
+        }
+      });
+      allTeachers.forEach(t => {
+        if (t.college) {
+          collegeSet.add('gmrit');
+        }
+      });
+      
+      const filteredColleges = Array.from(collegeSet).sort();
+      setColleges(filteredColleges);
       
       const groupsRes = await api.get(`/api/groups/${adminData.adminId}`);
       setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
@@ -245,131 +378,203 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
     }
   };
 
-  const studentQuery = normalize(studentSearch);
-  const teacherQuery = normalize(teacherSearch);
-  const groupQuery = normalize(groupSearch);
+  const studentQuery = useMemo(() => normalize(studentSearch), [studentSearch, normalize]);
+  const teacherQuery = useMemo(() => normalize(teacherSearch), [teacherSearch, normalize]);
+  const groupQuery = useMemo(() => normalize(groupSearch), [groupSearch, normalize]);
 
-  const studentSource = showAllStudents ? allStudents : students;
+  const studentSource = useMemo(() => showAllStudents ? allStudents : students, [showAllStudents, allStudents, students]);
 
-  const isStudentInSelectedGroup = (studentId) => {
+  const isStudentInSelectedGroup = useCallback((studentId) => {
     if (selectedStudentGroup === 'ALL') return true;
     const selectedGroupObject = groups.find((g) => g._id === selectedStudentGroup);
     if (!selectedGroupObject) return true;
     return Array.isArray(selectedGroupObject.students) && selectedGroupObject.students.includes(studentId);
-  };
+  }, [selectedStudentGroup, groups]);
 
-  const visibleStudents = studentSource.filter((student) => {
-    const matchesSearch = matchesStudentSearch(student, studentQuery);
+  const visibleStudents = useMemo(() => 
+    studentSource.filter((student) => {
+      const matchesSearch = matchesStudentSearch(student, studentQuery);
+      const matchesBranch =
+        selectedStudentBranch === 'ALL' || getBranchCode(student.department) === selectedStudentBranch;
+      const matchesGroup = isStudentInSelectedGroup(student.studentId);
+      return matchesSearch && matchesBranch && matchesGroup;
+    }),
+    [studentSource, studentQuery, selectedStudentBranch, isStudentInSelectedGroup, matchesStudentSearch, getBranchCode]
+  );
 
-    const matchesBranch =
-      selectedStudentBranch === 'ALL' || getBranchCode(student.department) === selectedStudentBranch;
+  const visibleTeachers = useMemo(() => {
+    let filtered = allTeachers;
+    
+    // Filter by college if not ALL
+    if (facultyFilterCollege !== 'ALL') {
+      filtered = filtered.filter((teacher) =>
+        normalize(teacher.college) === normalize(facultyFilterCollege)
+      );
+    }
+    
+    // Filter by department if not ALL
+    if (facultyFilterDepartment !== 'ALL') {
+      filtered = filtered.filter((teacher) =>
+        normalize(teacher.department) === normalize(facultyFilterDepartment)
+      );
+    }
+    
+    // Filter by search query
+    return filtered.filter((teacher) => {
+      if (!teacherQuery) return true;
+      return [
+        teacher.teacherId,
+        teacher.name,
+        teacher.email,
+        teacher.department,
+        teacher.designation,
+        teacher.college,
+      ].some((value) => normalize(value).includes(teacherQuery));
+    });
+  }, [allTeachers, teacherQuery, facultyFilterCollege, facultyFilterDepartment, normalize]);
 
-    const matchesGroup = isStudentInSelectedGroup(student.studentId);
+  const visibleGroups = useMemo(() =>
+    groups.filter((group) => {
+      if (!groupQuery) return true;
+      return [
+        group.name,
+        group.teacher,
+        group.college,
+        group.department,
+      ].some((value) => normalize(value).includes(groupQuery));
+    }),
+    [groups, groupQuery, normalize]
+  );
 
-    return matchesSearch && matchesBranch && matchesGroup;
-  });
-
-  const visibleTeachers = teachers.filter((teacher) => {
-    if (!teacherQuery) return true;
-    return [
-      teacher.teacherId,
-      teacher.name,
-      teacher.email,
-      teacher.department,
-      teacher.designation,
-      teacher.college,
-    ].some((value) => normalize(value).includes(teacherQuery));
-  });
-
-  const visibleGroups = groups.filter((group) => {
-    if (!groupQuery) return true;
-    return [
-      group.name,
-      group.teacher,
-      group.college,
-      group.department,
-    ].some((value) => normalize(value).includes(groupQuery));
-  });
-
-  const groupStudentQuery = normalize(groupStudentSearch);
+  const groupStudentQuery = useMemo(() => normalize(groupStudentSearch), [groupStudentSearch, normalize]);
   const hasAdminScope = Boolean(adminData?.institution && adminData?.department);
 
-  const scopedCreateGroupTeachers = allTeachers.filter((teacher) => {
+  const scopedCreateGroupTeachers = useMemo(() => allTeachers.filter((teacher) => {
+    if (groupForm.college && groupForm.department) {
+      return (
+        normalize(teacher.college) === normalize(groupForm.college) &&
+        normalize(teacher.department) === normalize(groupForm.department)
+      );
+    }
     if (!hasAdminScope) return true;
     return (
       normalize(teacher.college) === normalize(adminData.institution) &&
       normalize(teacher.department) === normalize(adminData.department)
     );
-  });
+  }), [allTeachers, groupForm.college, groupForm.department, hasAdminScope, adminData, normalize]);
 
-  const eligibleCreateGroupStudents =
-    allStudents.length > 0
-      ? allStudents
-      : students;
+  const eligibleCreateGroupStudents = useMemo(() => {
+    // When department is selected, filter by it (primary filter)
+    if (groupForm.department) {
+      const selectedDeptNorm = normalize(groupForm.department);
+      
+      return allStudents.filter((s) => {
+        if (!s.department) return false;
+        const studentDeptNorm = normalize(s.department);
+        return studentDeptNorm === selectedDeptNorm;
+      });
+    }
+    
+    // If nothing selected, return all students
+    return allStudents || [];
+  }, [groupForm.department, allStudents, normalize]);
 
-  const eligibleCreateGroupTeachers =
+  const eligibleCreateGroupTeachers = useMemo(() =>
     scopedCreateGroupTeachers.length > 0
       ? scopedCreateGroupTeachers
-      : (teachers.length > 0 ? teachers : allTeachers);
+      : (teachers.length > 0 ? teachers : allTeachers),
+    [scopedCreateGroupTeachers, teachers, allTeachers]
+  );
 
-  const visibleGroupStudents = eligibleCreateGroupStudents.filter((student) => {
-    return matchesStudentSearch(student, groupStudentQuery);
-  });
+  const visibleGroupStudents = useMemo(() => 
+    eligibleCreateGroupStudents.filter((student) => {
+      const matchesSearch = matchesStudentSearch(student, groupStudentQuery);
+      const matchesYear = groupFormYearFilter === 'ALL' || String(student.year) === groupFormYearFilter;
+      return matchesSearch && matchesYear;
+    }),
+    [eligibleCreateGroupStudents, groupStudentQuery, groupFormYearFilter, matchesStudentSearch]
+  );
 
-  const editGroupStudentQuery = normalize(editGroupStudentSearch);
-  const selectedEditGroup = groups.find((group) => group._id === editingGroup);
-  const scopedEditGroupStudents = allStudents.filter((student) => {
+  const editGroupStudentQuery = useMemo(() => normalize(editGroupStudentSearch), [editGroupStudentSearch, normalize]);
+  const selectedEditGroup = useMemo(() => groups.find((group) => group._id === editingGroup), [groups, editingGroup]);
+  
+  const scopedEditGroupStudents = useMemo(() => allStudents.filter((student) => {
     if (!selectedEditGroup) return true;
     return (
       normalize(student.college) === normalize(selectedEditGroup.college) &&
       normalize(student.department) === normalize(selectedEditGroup.department)
     );
-  });
+  }), [allStudents, selectedEditGroup, normalize]);
 
-  const scopedEditGroupTeachers = allTeachers.filter((teacher) => {
+  const scopedEditGroupTeachers = useMemo(() => allTeachers.filter((teacher) => {
     if (!selectedEditGroup) return true;
+    const college = editForm.college || selectedEditGroup.college;
+    const department = editForm.department || selectedEditGroup.department;
     return (
-      normalize(teacher.college) === normalize(selectedEditGroup.college) &&
-      normalize(teacher.department) === normalize(selectedEditGroup.department)
+      normalize(teacher.college) === normalize(college) &&
+      normalize(teacher.department) === normalize(department)
     );
-  });
+  }), [allTeachers, selectedEditGroup, editForm.college, editForm.department, normalize]);
 
-  const eligibleEditGroupStudents =
-    allStudents.length > 0
-      ? allStudents
-      : students;
+  const eligibleEditGroupStudents = useMemo(() => {
+    // When department is selected, filter by it
+    if (editForm.department) {
+      return allStudents.filter((s) => {
+        if (!s.department) return false;
+        return normalize(s.department) === normalize(editForm.department);
+      });
+    }
+    
+    // If form has no selections but there's a selected group, use the group's department
+    if (selectedEditGroup?.department) {
+      return allStudents.filter((s) => {
+        if (!s.department) return false;
+        return normalize(s.department) === normalize(selectedEditGroup.department);
+      });
+    }
+    
+    // Default: return all students
+    return allStudents || [];
+  }, [allStudents, editForm.department, selectedEditGroup, normalize]);
 
-  const eligibleEditGroupTeachers =
+  const eligibleEditGroupTeachers = useMemo(() =>
     scopedEditGroupTeachers.length > 0
       ? scopedEditGroupTeachers
-      : (teachers.length > 0 ? teachers : allTeachers);
+      : (teachers.length > 0 ? teachers : allTeachers),
+    [scopedEditGroupTeachers, teachers, allTeachers]
+  );
 
-  const visibleEditGroupStudents = eligibleEditGroupStudents.filter((student) => {
-    return matchesStudentSearch(student, editGroupStudentQuery);
-  });
+  const visibleEditGroupStudents = useMemo(() =>
+    eligibleEditGroupStudents.filter((student) => {
+      const matchesSearch = matchesStudentSearch(student, editGroupStudentQuery);
+      const matchesYear = editFormYearFilter === 'ALL' || String(student.year) === editFormYearFilter;
+      return matchesSearch && matchesYear;
+    }),
+    [eligibleEditGroupStudents, editGroupStudentQuery, editFormYearFilter, matchesStudentSearch]
+  );
 
-  const getTeacherDisplayName = (teacherId) => {
+  const getTeacherDisplayName = useCallback((teacherId) => {
     const teacher = teachers.find((t) => t.teacherId === teacherId);
     if (!teacher) return teacherId;
     const teacherBranch = teacher.department || 'No Branch';
     return `${teacher.name} (${teacherBranch})`;
-  };
+  }, [teachers]);
 
-  const getTeacherGroupCount = (teacherId) => {
+  const getTeacherGroupCount = useCallback((teacherId) => {
     return groups.filter((group) => group.teacher === teacherId).length;
-  };
+  }, [groups]);
 
-  const getStudentGroupCount = (studentId) => {
+  const getStudentGroupCount = useCallback((studentId) => {
     return groups.filter((group) => group.students?.includes(studentId)).length;
-  };
+  }, [groups]);
 
-  const getStudentsForTeacher = (teacherId) => {
+  const getStudentsForTeacher = useCallback((teacherId) => {
     const assignedGroups = groups.filter((group) => group.teacher === teacherId);
     const studentIds = new Set(assignedGroups.flatMap((group) => group.students || []));
     return allStudents.filter((student) => studentIds.has(student.studentId));
-  };
+  }, [groups, allStudents]);
 
-  const handleSaveAdminProfile = async (e) => {
+  const handleSaveAdminProfile = useCallback(async (e) => {
     e.preventDefault();
     if (!adminData?.adminId) return;
 
@@ -386,7 +591,7 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
     } finally {
       setSavingAdminProfile(false);
     }
-  };
+  }, [adminData, adminProfileForm, onAdminUpdate, getApiErrorMessage]);
 
 
 
@@ -406,34 +611,31 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
       )}
       {/* Modern Navigation */}
       <nav className={`backdrop-blur-xl border-b shadow-lg sticky top-0 z-40 transition-colors duration-300 ${dark ? 'bg-slate-900/80 border-white/10' : 'bg-white/80 border-white/20'}`}>
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4">
           <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <div className="flex items-center space-x-2 sm:space-x-3 flex-shrink-0">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-indigo-600 to-purple-600 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/>
                 </svg>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              <div className="hidden sm:block">
+                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                   Admin Dashboard
                 </h1>
-                <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-500'}`}>Manage your institution</p>
+                <p className={`text-xs sm:text-sm ${dark ? 'text-gray-400' : 'text-gray-500'}`}>Manage your institution</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2 sm:space-x-4">
               <button
                 onClick={() => setShowAdminEditModal(true)}
-                className={`hidden md:flex items-center space-x-2 px-4 py-2 rounded-xl transition-all duration-200 ${dark ? 'bg-white/10 hover:bg-white/20' : 'bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100'}`}
+                className={`hidden sm:flex items-center space-x-2 px-3 sm:px-4 py-2 rounded-xl transition-all duration-200 text-sm ${dark ? 'bg-white/10 hover:bg-white/20' : 'bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100'}`}
                 title="Edit admin profile"
               >
-                <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-sm font-bold">{adminData?.name?.charAt(0)}</span>
+                <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white text-xs font-bold">{adminData?.name?.charAt(0)}</span>
                 </div>
-                <span className={`text-sm font-medium ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Welcome, {adminData?.name}</span>
-                <svg className={`w-4 h-4 ${dark ? 'text-gray-300' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M17.414 2.586a2 2 0 010 2.828l-8.5 8.5A1 1 0 018.5 14H5a1 1 0 01-1-1v-3.5a1 1 0 01.293-.707l8.5-8.5a2 2 0 012.828 0z"/>
-                </svg>
+                <span className={`text-xs sm:text-sm font-medium hidden md:inline ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Welcome</span>
               </button>
               {/* Dark mode toggle */}
               <button
@@ -442,78 +644,78 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                 title={dark ? 'Light mode' : 'Dark mode'}
               >
                 {dark ? (
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd"/></svg>
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd"/></svg>
                 ) : (
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="currentColor" viewBox="0 0 20 20"><path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"/></svg>
                 )}
               </button>
               <button 
                 onClick={onLogout} 
-                className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-2 sm:px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 text-sm sm:text-base"
               >
-                <svg className="w-4 h-4 inline mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 inline sm:mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd"/>
                 </svg>
-                Logout
+                <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
           </div>
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
         {/* Modern Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
-            <div className="flex items-center justify-between">
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+          <div className={`backdrop-blur-xl rounded-2xl p-4 sm:p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
               <div>
-                <p className={`text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Total Students</p>
-                <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{totalStudents}</p>
+                <p className={`text-xs sm:text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Total Students</p>
+                <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{totalStudents}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
                 </svg>
               </div>
             </div>
           </div>
           
-          <div className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
-            <div className="flex items-center justify-between">
+          <div className={`backdrop-blur-xl rounded-2xl p-4 sm:p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
               <div>
-                <p className={`text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Total Teachers</p>
-                <p className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">{totalTeachers}</p>
+                <p className={`text-xs sm:text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Total Teachers</p>
+                <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">{totalTeachers}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
                 </svg>
               </div>
             </div>
           </div>
           
-          <div className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
-            <div className="flex items-center justify-between">
+          <div className={`backdrop-blur-xl rounded-2xl p-4 sm:p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
               <div>
-                <p className={`text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Active Groups</p>
-                <p className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">{groups.length}</p>
+                <p className={`text-xs sm:text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Active Groups</p>
+                <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">{groups.length}</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z"/>
                 </svg>
               </div>
             </div>
           </div>
           
-          <div className={`backdrop-blur-xl rounded-2xl p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
-            <div className="flex items-center justify-between">
+          <div className={`backdrop-blur-xl rounded-2xl p-4 sm:p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
+            <div className="flex items-center justify-between gap-2 sm:gap-4">
               <div>
-                <p className={`text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>System Status</p>
-                <p className="text-lg font-bold text-green-500">Online</p>
+                <p className={`text-xs sm:text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>System Status</p>
+                <p className="text-lg sm:text-2xl font-bold text-green-500">Online</p>
               </div>
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-500 rounded-xl flex items-center justify-center">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-500 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                 </svg>
               </div>
@@ -524,26 +726,27 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
         {/* Modern Tab Navigation */}
         <div className={`backdrop-blur-xl rounded-2xl shadow-xl border overflow-hidden ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
           <div className={`border-b ${dark ? 'border-white/10' : 'border-gray-200/50'}`}>
-            <nav className="flex space-x-8 px-6">
+            <nav className="flex space-x-2 sm:space-x-8 px-2 sm:px-6 overflow-x-auto">
               {[
                 { key: 'overview', label: 'Personal Info', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
                 { key: 'students', label: 'Students', icon: 'M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z' },
                 { key: 'teachers', label: 'Faculty', icon: 'M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z' },
+                { key: 'assignments', label: 'Assignments', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' },
                 { key: 'groups', label: 'Groups', icon: 'M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3z' }
               ].map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center space-x-2 py-4 px-1 border-b-2 font-medium text-sm transition-all duration-200 ${
+                  className={`flex items-center space-x-1 sm:space-x-2 py-4 px-1 sm:px-1 border-b-2 font-medium text-xs sm:text-sm whitespace-nowrap transition-all duration-200 ${
                     activeTab === tab.key 
                       ? 'border-indigo-500 text-indigo-400' 
                       : dark ? 'border-transparent text-gray-500 hover:text-gray-300 hover:border-gray-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d={tab.icon} clipRule="evenodd"/>
                   </svg>
-                  <span>{tab.label}</span>
+                  <span className="hidden sm:inline">{tab.label}</span>
                   {tab.key === 'students' && (
                     <span className={`px-2 py-0.5 text-xs rounded-full ${dark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
                       {totalStudents}
@@ -552,6 +755,11 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                   {tab.key === 'teachers' && (
                     <span className={`px-2 py-0.5 text-xs rounded-full ${dark ? 'bg-green-500/20 text-green-300' : 'bg-green-100 text-green-700'}`}>
                       {totalTeachers}
+                    </span>
+                  )}
+                  {tab.key === 'assignments' && (
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${dark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>
+                      {allTeachers.filter(t => getTeacherGroupCount(t.teacherId) > 0).length}
                     </span>
                   )}
                   {tab.key === 'groups' && (
@@ -783,6 +991,43 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                 </div>
               </div>
               
+              <div className="mb-4 flex flex-col sm:flex-row gap-3">
+                <div className="flex-1">
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>College</label>
+                  <div className={`w-full px-4 py-2.5 border rounded-xl ${dark ? 'bg-gradient-to-r from-green-500/10 to-emerald-500/10 border-white/10 text-white' : 'bg-white/80 border-gray-200 text-gray-900'} font-semibold`}>
+                    gmrit
+                  </div>
+                </div>
+                
+                <div className="flex-1">
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Filter by Department</label>
+                  <select
+                    value={facultyFilterDepartment}
+                    onChange={(e) => setFacultyFilterDepartment(e.target.value)}
+                    className={`w-full px-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 ${dark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white/50 border-gray-200 text-gray-900'}`}
+                  >
+                    <option value="ALL">All Departments</option>
+                    {facultyDepartments.map((dept) => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="flex-1">
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>&nbsp;</label>
+                  <button
+                    onClick={() => {
+                      setFacultyFilterCollege('gmrit');
+                      setFacultyFilterDepartment('ALL');
+                      setTeacherSearch('');
+                    }}
+                    className="w-full px-4 py-2.5 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl hover:from-gray-600 hover:to-gray-700 transition-all duration-200 font-semibold text-sm"
+                  >
+                    Clear Filters
+                  </button>
+                </div>
+              </div>
+              
               <div className={`backdrop-blur-sm rounded-2xl shadow-xl border overflow-hidden ${dark ? 'bg-white/5 border-white/10' : 'bg-white/80 border-white/20'}`}>
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1100px]">
@@ -893,6 +1138,102 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
             </div>
           )}
 
+          {activeTab === 'assignments' && (
+            <div className="p-8">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-2xl font-bold bg-gradient-to-r from-amber-600 to-orange-600 bg-clip-text text-transparent">Teacher Assignments</h3>
+                  <p className={`mt-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>View and manage all teacher group and student assignments</p>
+                </div>
+                <div className={`px-4 py-2 rounded-xl ${dark ? 'bg-amber-500/10' : 'bg-gradient-to-r from-amber-50 to-orange-50'}`}>
+                  <span className={`text-sm font-medium ${dark ? 'text-amber-400' : 'text-amber-700'}`}>{allTeachers.filter(t => getTeacherGroupCount(t.teacherId) > 0).length} Assigned Teachers</span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {allTeachers
+                  .filter(teacher => getTeacherGroupCount(teacher.teacherId) > 0)
+                  .map((teacher) => {
+                    const groupCount = getTeacherGroupCount(teacher.teacherId);
+                    const studentCount = getStudentsForTeacher(teacher.teacherId).length;
+                    const teacherGroups = groups.filter(g => g.teacher === teacher.teacherId);
+                    return (
+                      <div key={teacher.teacherId} className={`backdrop-blur-sm rounded-2xl border p-6 transition-all duration-200 ${dark ? 'bg-white/5 border-white/10 hover:bg-white/8' : 'bg-white/80 border-white/20 hover:bg-white/90'}`}>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                          <div className="flex items-center gap-4 md:col-span-2">
+                            <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-orange-500 rounded-lg flex items-center justify-center">
+                              <span className="text-white font-bold text-lg">{teacher.name?.charAt(0)}</span>
+                            </div>
+                            <div>
+                              <h4 className={`text-lg font-bold ${dark ? 'text-gray-200' : 'text-gray-800'}`}>{teacher.name}</h4>
+                              <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-600'}`}>{teacher.designation}</p>
+                              <p className={`text-xs ${dark ? 'text-gray-500' : 'text-gray-500'}`}>{teacher.department} | {teacher.college}</p>
+                            </div>
+                          </div>
+                          <div className={`rounded-xl p-3 ${dark ? 'bg-blue-500/10' : 'bg-blue-100/50'}`}>
+                            <p className={`text-xs font-semibold ${dark ? 'text-blue-300' : 'text-blue-700'}`}>Groups Assigned</p>
+                            <p className={`text-2xl font-bold ${dark ? 'text-blue-400' : 'text-blue-600'}`}>{groupCount}</p>
+                          </div>
+                          <div className={`rounded-xl p-3 ${dark ? 'bg-green-500/10' : 'bg-green-100/50'}`}>
+                            <p className={`text-xs font-semibold ${dark ? 'text-green-300' : 'text-green-700'}`}>Students Assigned</p>
+                            <p className={`text-2xl font-bold ${dark ? 'text-green-400' : 'text-green-600'}`}>{studentCount}</p>
+                          </div>
+                        </div>
+
+                        {teacherGroups.length > 0 && (
+                          <div className={`border-t ${dark ? 'border-white/10' : 'border-gray-200'} pt-4`}>
+                            <p className={`text-sm font-semibold mb-3 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Assigned Groups:</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {teacherGroups.map((group) => (
+                                <div key={group._id} className={`rounded-lg p-2 flex items-center justify-between ${dark ? 'bg-white/5 border border-white/10' : 'bg-gray-100 border border-gray-200'}`}>
+                                  <div className="flex items-center gap-2">
+                                    <div className="w-6 h-6 bg-gradient-to-br from-purple-500 to-pink-500 rounded flex items-center justify-center">
+                                      <span className="text-white text-xs font-bold">{group.name?.charAt(0)}</span>
+                                    </div>
+                                    <div>
+                                      <p className={`text-sm font-medium ${dark ? 'text-gray-300' : 'text-gray-700'}`}>{group.name}</p>
+                                      <p className={`text-xs ${dark ? 'text-gray-500' : 'text-gray-500'}`}>{group.students?.length || 0} students</p>
+                                    </div>
+                                  </div>
+                                  <div className={`px-2 py-1 rounded text-xs font-semibold ${dark ? 'bg-purple-500/20 text-purple-300' : 'bg-purple-100 text-purple-700'}`}>
+                                    {group.department}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {studentCount > 0 && (
+                          <div className={`border-t ${dark ? 'border-white/10' : 'border-gray-200'} pt-4 mt-4`}>
+                            <p className={`text-sm font-semibold mb-3 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Assigned Students ({studentCount}):</p>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 max-h-48 overflow-y-auto">
+                              {getStudentsForTeacher(teacher.teacherId).map((student) => (
+                                <div key={student.studentId} className={`rounded-lg p-2 ${dark ? 'bg-white/5 border border-white/10' : 'bg-gray-100 border border-gray-200'}`}>
+                                  <p className={`text-sm font-medium truncate ${dark ? 'text-gray-300' : 'text-gray-700'}`}>{student.name}</p>
+                                  <p className={`text-xs truncate ${dark ? 'text-gray-500' : 'text-gray-600'}`}>{student.studentId}</p>
+                                  <p className={`text-xs ${dark ? 'text-gray-600' : 'text-gray-500'}`}>{student.year ? `Year ${student.year}` : 'N/A'}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })
+                  .slice(0, 10)}
+
+                {allTeachers.filter(t => getTeacherGroupCount(t.teacherId) === 0).length > 0 && (
+                  <div className={`rounded-xl p-8 text-center ${dark ? 'bg-white/5 border border-white/10' : 'bg-gray-50 border border-gray-200'}`}>
+                    <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      {allTeachers.filter(t => getTeacherGroupCount(t.teacherId) === 0).length} teacher(s) have no assignments yet
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'groups' && (
             <div className="p-8">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -932,28 +1273,33 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                 <form onSubmit={async (e) => {
                   e.preventDefault();
                   try {
-                    if (!adminData?.adminId || !adminData?.institution || !adminData?.department) {
-                      alert('Admin scope is missing. Please re-login and try again.');
+                    if (!adminData?.adminId) {
+                      alert('Admin ID is missing. Please re-login and try again.');
                       return;
                     }
 
+                    // Use form's college/department if selected, otherwise use admin's scope
+                    const groupCollege = groupForm.college || adminData?.institution || '';
+                    const groupDepartment = groupForm.department || adminData?.department || '';
+
                     const groupData = {
                       name: String(groupForm.name || '').trim(),
-                      college: String(adminData.institution || '').trim(),
-                      department: String(adminData.department || '').trim(),
+                      college: String(groupCollege).trim(),
+                      department: String(groupDepartment).trim(),
                       teacher: groupForm.teacher,
                       students: groupForm.students,
                       createdBy: adminData.adminId
                     };
 
-                    if (!groupData.name || !groupData.teacher) {
-                      alert('Group name and teacher are required.');
+                    if (!groupData.name || !groupData.teacher || !groupData.college || !groupData.department) {
+                      alert('Group name, teacher, college, and department are required.');
                       return;
                     }
 
                     const response = await api.post('/api/groups', groupData);
-                    setGroupForm({ name: '', teacher: '', students: [] });
+                    setGroupForm({ name: '', college: '', department: '', teacher: '', students: [] });
                     setGroupStudentSearch('');
+                    setGroupFormYearFilter('ALL');
                     setShowAllCreateGroupStudents(false);
                     setSelectedStudentGroup(response.data._id || 'ALL');
                     setLastGroupCreated(response.data);
@@ -975,6 +1321,31 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                     />
                   </div>
                   
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>College/Institution</label>
+                      <div className={`w-full px-4 py-3 border rounded-xl font-semibold ${dark ? 'bg-gradient-to-r from-purple-500/10 to-pink-500/10 border-white/10 text-white' : 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200 text-gray-900'}`}>
+                        gmrit
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Department/Branch</label>
+                      <select
+                        value={groupForm.department}
+                        onChange={(e) => setGroupForm({...groupForm, department: e.target.value})}
+                        className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm ${dark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white/50 border-gray-200 text-gray-900'}`}
+                      >
+                        <option value="">Select Department</option>
+                        {allAvailableDepartments.map((department) => (
+                          <option key={department} value={department}>
+                            {department}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
                   <div>
                     <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Assign Teacher</label>
                     <select
@@ -984,15 +1355,19 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                       required
                     >
                       <option value="">Select Teacher</option>
-                      {eligibleCreateGroupTeachers.map((teacher) => (
-                        <option key={teacher.teacherId} value={teacher.teacherId}>
-                          {teacher.name} ({teacher.department || 'No Branch'})
-                        </option>
-                      ))}
+                      {scopedCreateGroupTeachers.length > 0 ? (
+                        scopedCreateGroupTeachers.map((teacher) => (
+                          <option key={teacher.teacherId} value={teacher.teacherId}>
+                            {teacher.name} ({teacher.department || 'No Branch'})
+                          </option>
+                        ))
+                      ) : (
+                        <option disabled>No teachers available for selected college/department</option>
+                      )}
                     </select>
-                    {eligibleCreateGroupTeachers.length === 0 && (
+                    {scopedCreateGroupTeachers.length === 0 && (
                       <p className={`mt-2 text-xs ${dark ? 'text-amber-300' : 'text-amber-700'}`}>
-                        No teachers available. Please add teachers first or update admin scope.
+                        No teachers available for selected college/department. {groupForm.college && groupForm.department ? 'Please add teachers or select different college/department.' : 'Please select college and department first.'}
                       </p>
                     )}
                   </div>
@@ -1026,6 +1401,26 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                       >
                         {showAllCreateGroupStudents ? 'Close View' : 'View All'}
                       </button>
+                    </div>
+                    <div className="mb-3 space-y-2">
+                      <p className={`text-xs mb-2 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
+                        Filter by Year:
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        {['ALL', '1', '2', '3', '4'].map((year) => (
+                          <button
+                            key={year}
+                            onClick={() => setGroupFormYearFilter(year)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 ${
+                              groupFormYearFilter === year
+                                ? dark ? 'bg-purple-600/80 border-purple-400 text-white' : 'bg-purple-600 border-purple-700 text-white'
+                                : dark ? 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10' : 'bg-gray-100 border-gray-200 text-gray-700 hover:bg-gray-200'
+                            }`}
+                          >
+                            {year === 'ALL' ? 'All Years' : `Year ${year}`}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                     <p className={`text-xs mb-3 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
                       Showing {visibleGroupStudents.length} of {eligibleCreateGroupStudents.length} students | Selected {groupForm.students.length}
@@ -1149,10 +1544,13 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                               setEditingGroup(group._id);
                               setEditForm({
                                 name: group.name,
+                                college: group.college,
+                                department: group.department,
                                 teacher: group.teacher,
                                 students: group.students
                               });
                               setEditGroupStudentSearch('');
+                              setEditFormYearFilter('ALL');
                               setShowAllEditGroupStudents(false);
                             }}
                             className="bg-gradient-to-r from-blue-500 to-indigo-500 text-white px-4 py-2 rounded-xl font-medium flex items-center space-x-2"
@@ -1299,7 +1697,10 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                   <h3 className={`text-xl font-bold ${dark ? 'text-gray-200' : 'text-gray-800'}`}>Edit Group</h3>
                 </div>
                 <button
-                  onClick={() => setEditingGroup(null)}
+                  onClick={() => {
+                    setEditingGroup(null);
+                    setEditFormYearFilter('ALL');
+                  }}
                   className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200 ${dark ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100 hover:bg-gray-200'}`}
                 >
                   <svg className={`w-4 h-4 ${dark ? 'text-gray-400' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
@@ -1314,6 +1715,7 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
               try {
                 await api.put(`/api/groups/${editingGroup}`, editForm);
                 setEditingGroup(null);
+                setEditFormYearFilter('ALL');
                 fetchData();
               } catch (error) {
                 alert('Error updating group: ' + (error.response?.data?.error || error.message));
@@ -1331,6 +1733,31 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                 />
               </div>
               
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>College/Institution</label>
+                  <div className={`w-full px-4 py-3 border rounded-xl font-semibold ${dark ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border-white/10 text-white' : 'bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200 text-gray-900'}`}>
+                    gmrit
+                  </div>
+                </div>
+                
+                <div>
+                  <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Department/Branch</label>
+                  <select
+                    value={editForm.department}
+                    onChange={(e) => setEditForm({...editForm, department: e.target.value})}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 backdrop-blur-sm ${dark ? 'bg-slate-800 border-white/10 text-white' : 'bg-white/50 border-gray-200 text-gray-900'}`}
+                  >
+                    <option value="">Select Department</option>
+                    {allAvailableDepartments.map((department) => (
+                      <option key={department} value={department}>
+                        {department}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
               <div>
                 <label className={`block text-sm font-semibold mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>Assign Teacher</label>
                 <select
@@ -1340,15 +1767,19 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                   required
                 >
                   <option value="">Select Teacher</option>
-                  {eligibleEditGroupTeachers.map((teacher) => (
-                    <option key={teacher.teacherId} value={teacher.teacherId}>
-                      {teacher.name} ({teacher.department || 'No Branch'})
-                    </option>
-                  ))}
+                  {eligibleEditGroupTeachers.length > 0 ? (
+                    eligibleEditGroupTeachers.map((teacher) => (
+                      <option key={teacher.teacherId} value={teacher.teacherId}>
+                        {teacher.name} ({teacher.department || 'No Branch'})
+                      </option>
+                    ))
+                  ) : (
+                    <option disabled>No teachers available for selected college/department</option>
+                  )}
                 </select>
                 {eligibleEditGroupTeachers.length === 0 && (
                   <p className={`mt-2 text-xs ${dark ? 'text-amber-300' : 'text-amber-700'}`}>
-                    No matching teachers available for this group scope.
+                    No matching teachers available. Please update college/department selection.
                   </p>
                 )}
               </div>
@@ -1382,6 +1813,26 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                   >
                     {showAllEditGroupStudents ? 'Close View' : 'View All'}
                   </button>
+                </div>
+                <div className="mb-3 space-y-2">
+                  <p className={`text-xs mb-2 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Filter by Year:
+                  </p>
+                  <div className="flex gap-2 flex-wrap">
+                    {['ALL', '1', '2', '3', '4'].map((year) => (
+                      <button
+                        key={year}
+                        onClick={() => setEditFormYearFilter(year)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all duration-200 ${
+                          editFormYearFilter === year
+                            ? dark ? 'bg-blue-600/80 border-blue-400 text-white' : 'bg-blue-600 border-blue-700 text-white'
+                            : dark ? 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10' : 'bg-gray-100 border-gray-200 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {year === 'ALL' ? 'All Years' : `Year ${year}`}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <p className={`text-xs mb-3 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
                   Showing {visibleEditGroupStudents.length} of {eligibleEditGroupStudents.length} students | Selected {editForm.students.length}
@@ -1442,7 +1893,10 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setEditingGroup(null)}
+                  onClick={() => {
+                    setEditingGroup(null);
+                    setEditFormYearFilter('ALL');
+                  }}
                   className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                 >
                   Cancel

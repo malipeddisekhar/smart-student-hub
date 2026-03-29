@@ -55,58 +55,59 @@ const StudentDetails = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
+        <div className="w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
+          <div className="flex justify-between items-center gap-2 sm:gap-4">
             <button 
               onClick={() => navigate('/')}
-              className="flex items-center text-indigo-600 hover:text-indigo-800"
+              className="flex items-center text-xs sm:text-sm text-indigo-600 hover:text-indigo-800 gap-1 sm:gap-2"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
               </svg>
-              Back to Home
+              <span className="hidden sm:inline">Back to Home</span>
+              <span className="inline sm:hidden">Back</span>
             </button>
-            <h1 className="text-2xl font-bold text-gray-900">Student Profile</h1>
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">Student Profile</h1>
           </div>
         </div>
       </div>
 
       {/* Student Details */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+      <div className="w-full max-w-4xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-8">
+        <div className="bg-white rounded-lg sm:rounded-xl shadow-lg overflow-hidden">
           {/* Profile Header */}
-          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-8">
-            <div className="flex items-center space-x-6">
+          <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-3 sm:px-4 lg:px-6 py-4 sm:py-6 lg:py-8">
+            <div className="flex items-center gap-3 sm:gap-4 lg:gap-6">
               <div className="flex-shrink-0">
                 {student.profile?.profileImage ? (
                   <img 
                     src={student.profile.profileImage} 
                     alt={student.name}
-                    className="w-24 h-24 rounded-full border-4 border-white object-cover"
+                    className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-full border-3 sm:border-4 border-white object-cover"
                   />
                 ) : (
-                  <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center border-4 border-white">
-                    <span className="text-indigo-600 font-bold text-2xl">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 bg-white rounded-full flex items-center justify-center border-3 sm:border-4 border-white">
+                    <span className="text-indigo-600 font-bold text-lg sm:text-xl md:text-2xl">
                       {student.name.charAt(0).toUpperCase()}
                     </span>
                   </div>
                 )}
               </div>
-              <div className="text-white">
-                <h2 className="text-3xl font-bold">{student.name}</h2>
-                <p className="text-indigo-100">Student ID: {student.studentId}</p>
-                <p className="text-indigo-100">Roll Number: {student.rollNumber}</p>
+              <div className="text-white min-w-0">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold truncate">{student.name}</h2>
+                <p className="text-xs sm:text-sm text-indigo-100">Student ID: {student.studentId}</p>
+                <p className="text-xs sm:text-sm text-indigo-100">Roll Number: {student.rollNumber}</p>
               </div>
             </div>
           </div>
 
           {/* Details Grid */}
-          <div className="p-6">
-            <div className="grid md:grid-cols-2 gap-6">
+          <div className="p-3 sm:p-4 lg:p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {/* Academic Info */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Academic Information</h3>
-                <div className="space-y-2">
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 border-b pb-2">Academic Information</h3>
+                <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
                   <p><span className="font-medium">College:</span> {student.college}</p>
                   <p><span className="font-medium">Department:</span> {student.department}</p>
                   <p><span className="font-medium">Year:</span> {student.year}</p>
@@ -116,9 +117,9 @@ const StudentDetails = () => {
               </div>
 
               {/* Contact Info */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900 border-b pb-2">Contact Information</h3>
-                <div className="space-y-2">
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 border-b pb-2">Contact Information</h3>
+                <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
                   <p><span className="font-medium">Email:</span> {student.email}</p>
                   <p><span className="font-medium">Mobile:</span> {student.profile?.mobileNumber || 'N/A'}</p>
                   <p><span className="font-medium">College Email:</span> {student.profile?.collegeEmail || 'N/A'}</p>
@@ -127,32 +128,32 @@ const StudentDetails = () => {
             </div>
 
             {/* Stats */}
-            <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-blue-50 p-4 rounded-lg text-center">
-                <div className="text-2xl font-bold text-blue-600">{student.personalCertificates?.length || 0}</div>
-                <div className="text-sm text-blue-800">Personal Certificates</div>
+            <div className="mt-6 sm:mt-8 grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              <div className="bg-blue-50 p-2.5 sm:p-4 rounded-lg text-center">
+                <div className="text-lg sm:text-2xl font-bold text-blue-600">{student.personalCertificates?.length || 0}</div>
+                <div className="text-xs sm:text-sm text-blue-800">Personal Certificates</div>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg text-center">
-                <div className="text-2xl font-bold text-green-600">{student.academicCertificates?.filter(cert => cert.status !== 'rejected').length || 0}</div>
-                <div className="text-sm text-green-800">Academic Certificates</div>
+              <div className="bg-green-50 p-2.5 sm:p-4 rounded-lg text-center">
+                <div className="text-lg sm:text-2xl font-bold text-green-600">{student.academicCertificates?.filter(cert => cert.status !== 'rejected').length || 0}</div>
+                <div className="text-xs sm:text-sm text-green-800">Academic Certificates</div>
               </div>
-              <div className="bg-purple-50 p-4 rounded-lg text-center">
-                <div className="text-2xl font-bold text-purple-600">{student.projects?.length || 0}</div>
-                <div className="text-sm text-purple-800">Projects</div>
+              <div className="bg-purple-50 p-2.5 sm:p-4 rounded-lg text-center">
+                <div className="text-lg sm:text-2xl font-bold text-purple-600">{student.projects?.length || 0}</div>
+                <div className="text-xs sm:text-sm text-purple-800">Projects</div>
               </div>
-              <div className="bg-orange-50 p-4 rounded-lg text-center">
-                <div className="text-2xl font-bold text-orange-600">{Object.keys(student.skills || {}).length}</div>
-                <div className="text-sm text-orange-800">Skills</div>
+              <div className="bg-orange-50 p-2.5 sm:p-4 rounded-lg text-center">
+                <div className="text-lg sm:text-2xl font-bold text-orange-600">{Object.keys(student.skills || {}).length}</div>
+                <div className="text-xs sm:text-sm text-orange-800">Skills</div>
               </div>
             </div>
 
             {/* Skills */}
             {student.skills && Object.keys(student.skills).length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Skills</h3>
-                <div className="flex flex-wrap gap-2">
+              <div className="mt-6 sm:mt-8">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Skills</h3>
+                <div className="flex flex-wrap gap-2 sm:gap-3">
                   {Object.entries(student.skills).map(([skill, count]) => (
-                    <span key={skill} className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
+                    <span key={skill} className="inline-flex items-center px-2 sm:px-3 py-1 rounded-full text-xs sm:text-sm font-medium bg-indigo-100 text-indigo-800">
                       {skill} ({count})
                     </span>
                   ))}
@@ -162,30 +163,30 @@ const StudentDetails = () => {
 
             {/* Personal Certificates */}
             {student.personalCertificates && student.personalCertificates.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-                  <span className="w-2 h-8 bg-blue-500 rounded mr-3"></span>
+              <div className="mt-6 sm:mt-8">
+                <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center">
+                  <span className="w-1 sm:w-2 h-6 sm:h-8 bg-blue-500 rounded mr-2 sm:mr-3"></span>
                   Personal Certificates
                 </h3>
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                   {student.personalCertificates.map((cert, index) => (
-                    <div key={index} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1" 
+                    <div key={index} className="bg-white rounded-lg sm:rounded-xl shadow-md sm:shadow-lg hover:shadow-lg sm:hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-0.5 sm:hover:-translate-y-1 overflow-hidden" 
                          onClick={() => { setSelectedCertificate({...cert, type: 'personal'}); setShowModal(true); }}>
-                      <div className="relative overflow-hidden rounded-t-xl">
+                      <div className="relative overflow-hidden">
                         {cert.image ? (
-                          <img src={cert.image} alt={cert.name} className="w-full h-48 object-cover" />
+                          <img src={cert.image} alt={cert.name} className="w-full h-24 sm:h-32 md:h-40 lg:h-48 object-cover" />
                         ) : (
-                          <div className="w-full h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
-                            <span className="text-white text-4xl font-bold">{cert.name.charAt(0)}</span>
+                          <div className="w-full h-24 sm:h-32 md:h-40 lg:h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
+                            <span className="text-white text-2xl sm:text-3xl md:text-4xl font-bold">{cert.name.charAt(0)}</span>
                           </div>
                         )}
-                        <div className="absolute top-3 right-3">
-                          <span className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-medium">Personal</span>
+                        <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
+                          <span className="bg-blue-500 text-white px-2 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-medium">Personal</span>
                         </div>
                       </div>
-                      <div className="p-4">
-                        <h4 className="font-bold text-gray-900 mb-2 truncate">{cert.name}</h4>
-                        <p className="text-sm text-gray-600 mb-1">By: {cert.issuer}</p>
+                      <div className="p-2 sm:p-4">
+                        <h4 className="font-bold text-gray-900 mb-1 truncate text-xs sm:text-sm">{cert.name}</h4>
+                        <p className="text-xs text-gray-600 mb-1">By: {cert.issuer}</p>
                         <p className="text-xs text-gray-500">{new Date(cert.date).toLocaleDateString()}</p>
                       </div>
                     </div>
@@ -196,25 +197,25 @@ const StudentDetails = () => {
 
             {/* Academic Certificates */}
             {student.academicCertificates && student.academicCertificates.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
-                  <span className="w-2 h-8 bg-green-500 rounded mr-3"></span>
+              <div className="mt-6 sm:mt-8">
+                <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900 mb-4 sm:mb-6 flex items-center">
+                  <span className="w-1 sm:w-2 h-6 sm:h-8 bg-green-500 rounded mr-2 sm:mr-3"></span>
                   Academic Certificates
                 </h3>
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                   {student.academicCertificates.filter(cert => cert.status !== 'rejected').map((cert, index) => (
-                    <div key={index} className="bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1" 
+                    <div key={index} className="bg-white rounded-lg sm:rounded-xl shadow-md sm:shadow-lg hover:shadow-lg sm:hover:shadow-xl transition-all duration-300 cursor-pointer transform hover:-translate-y-0.5 sm:hover:-translate-y-1 overflow-hidden" 
                          onClick={() => { setSelectedCertificate({...cert, type: 'academic'}); setShowModal(true); }}>
-                      <div className="relative overflow-hidden rounded-t-xl">
+                      <div className="relative overflow-hidden">
                         {cert.image ? (
-                          <img src={cert.image} alt={cert.certificateName} className="w-full h-48 object-cover" />
+                          <img src={cert.image} alt={cert.certificateName} className="w-full h-24 sm:h-32 md:h-40 lg:h-48 object-cover" />
                         ) : (
-                          <div className="w-full h-48 bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
-                            <span className="text-white text-4xl font-bold">{cert.certificateName.charAt(0)}</span>
+                          <div className="w-full h-24 sm:h-32 md:h-40 lg:h-48 bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
+                            <span className="text-white text-2xl sm:text-3xl md:text-4xl font-bold">{cert.certificateName.charAt(0)}</span>
                           </div>
                         )}
-                        <div className="absolute top-3 right-3">
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
+                          <span className={`px-2 py-0.5 sm:px-2 sm:py-1 rounded-full text-xs font-medium ${
                             cert.status === 'approved' ? 'bg-green-500 text-white' :
                             'bg-yellow-500 text-white'
                           }`}>
@@ -222,9 +223,9 @@ const StudentDetails = () => {
                           </span>
                         </div>
                       </div>
-                      <div className="p-4">
-                        <h4 className="font-bold text-gray-900 mb-2 truncate">{cert.certificateName}</h4>
-                        <p className="text-sm text-gray-600 mb-1">By: {cert.issuedBy}</p>
+                      <div className="p-2 sm:p-4">
+                        <h4 className="font-bold text-gray-900 mb-1 truncate text-xs sm:text-sm">{cert.certificateName}</h4>
+                        <p className="text-xs text-gray-600 mb-1">By: {cert.issuedBy}</p>
                         <p className="text-xs text-gray-500">{new Date(cert.date).toLocaleDateString()}</p>
                       </div>
                     </div>
@@ -235,17 +236,17 @@ const StudentDetails = () => {
 
             {/* Projects */}
             {student.projects && student.projects.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Projects</h3>
-                <div className="grid md:grid-cols-2 gap-4">
+              <div className="mt-6 sm:mt-8">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-3 sm:mb-4">Projects</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   {student.projects.map((project, index) => (
-                    <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                      <h4 className="font-medium text-gray-900 mb-2">{project.title}</h4>
-                      <p className="text-sm text-gray-600 mb-3">{project.description}</p>
-                      <div className="flex space-x-2">
+                    <div key={index} className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+                      <h4 className="font-medium text-gray-900 mb-1 sm:mb-2 text-xs sm:text-sm">{project.title}</h4>
+                      <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">{project.description}</p>
+                      <div className="flex gap-2">
                         {project.githubLink && (
                           <a href={project.githubLink} target="_blank" rel="noopener noreferrer" 
-                             className="inline-flex items-center px-3 py-1 bg-gray-800 text-white text-xs rounded hover:bg-gray-700">
+                             className="inline-flex items-center px-2 sm:px-3 py-1 bg-gray-800 text-white text-xs rounded hover:bg-gray-700">
                             GitHub
                           </a>
                         )}

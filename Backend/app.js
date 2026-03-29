@@ -708,9 +708,16 @@ app.put('/api/groups/:groupId', async (req, res) => {
     const group = await Group.findById(groupId);
     if (!group) return res.status(404).json({ error: 'Group not found' });
 
-    const { name, teacher, students } = req.body;
+    const { name, college, department, teacher, students } = req.body;
 
     if (name !== undefined) group.name = String(name).trim();
+
+    // Allow updating college and department
+    const updatedCollege = college !== undefined ? String(college).trim() : group.college;
+    const updatedDepartment = department !== undefined ? String(department).trim() : group.department;
+
+    if (college !== undefined) group.college = updatedCollege;
+    if (department !== undefined) group.department = updatedDepartment;
 
     if (teacher !== undefined) {
       const teacherExists = await Teacher.findOne({ teacherId: teacher }).lean();
@@ -719,10 +726,10 @@ app.put('/api/groups/:groupId', async (req, res) => {
       }
 
       if (
-        String(teacherExists.college || '').trim().toLowerCase() !== String(group.college || '').trim().toLowerCase() ||
-        String(teacherExists.department || '').trim().toLowerCase() !== String(group.department || '').trim().toLowerCase()
+        String(teacherExists.college || '').trim().toLowerCase() !== updatedCollege.toLowerCase() ||
+        String(teacherExists.department || '').trim().toLowerCase() !== updatedDepartment.toLowerCase()
       ) {
-        return res.status(400).json({ error: 'Selected teacher does not belong to this group college/department' });
+        return res.status(400).json({ error: 'Selected teacher does not belong to the specified college/department' });
       }
 
       group.teacher = teacher;
@@ -741,12 +748,12 @@ app.put('/api/groups/:groupId', async (req, res) => {
 
         const allInScope = matchedStudents.every(
           (student) =>
-            String(student.college || '').trim().toLowerCase() === String(group.college || '').trim().toLowerCase() &&
-            String(student.department || '').trim().toLowerCase() === String(group.department || '').trim().toLowerCase()
+            String(student.college || '').trim().toLowerCase() === updatedCollege.toLowerCase() &&
+            String(student.department || '').trim().toLowerCase() === updatedDepartment.toLowerCase()
         );
 
         if (!allInScope) {
-          return res.status(400).json({ error: 'Selected students must belong to this group college/department' });
+          return res.status(400).json({ error: 'Selected students must belong to the specified college/department' });
         }
       }
       group.students = studentIds;
