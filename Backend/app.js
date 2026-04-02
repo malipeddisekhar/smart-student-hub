@@ -111,7 +111,22 @@ const personalUpload = multer({ storage: personalStorage });
 
 
 // Connect to MongoDB
-connectDB();
+connectDB().then(() => {
+  console.log("DB connected, starting server...");
+
+  server.listen(port, () => {
+    console.log(`🚀 Server running at http://localhost:${port}`);
+    console.log('🔌 Socket.IO ready for real-time notifications');
+    // Run first auto-refresh 1 minute after server starts
+    setTimeout(autoRefreshAllStats, 60 * 1000);
+    // Then every 30 minutes
+    setInterval(autoRefreshAllStats, 30 * 60 * 1000);
+    console.log('🔄 Auto-refresh scheduled: every 30 minutes');
+  });
+}).catch((err) => {
+  console.error("Failed to connect DB ❌", err);
+  process.exit(1);
+});
 
 // Middleware
 app.use(cors({
@@ -2182,14 +2197,4 @@ app.post('/api/feedback/send', async (req, res) => {
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
-});
-
-server.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-  console.log('🔌 Socket.IO ready for real-time notifications');
-  // Run first auto-refresh 1 minute after server starts
-  setTimeout(autoRefreshAllStats, 60 * 1000);
-  // Then every 30 minutes
-  setInterval(autoRefreshAllStats, 30 * 60 * 1000);
-  console.log('🔄 Auto-refresh scheduled: every 30 minutes');
 });
