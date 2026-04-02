@@ -5,6 +5,9 @@ import api from '../services/api';
 const PersonalAchievements = ({ studentData }) => {
   const navigate = useNavigate();
   const [certificates, setCertificates] = useState([]);
+  const [loadingCertificates, setLoadingCertificates] = useState(true);
+  const [savingCertificate, setSavingCertificate] = useState(false);
+  const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
   const [showForm, setShowForm] = useState(false);
   const [selectedCertificate, setSelectedCertificate] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState({ show: false, certId: null });
@@ -19,35 +22,30 @@ const PersonalAchievements = ({ studentData }) => {
   });
 
   useEffect(() => {
-    testBackendConnection();
-    fetchCertificates();
-  }, []);
-
-  const testBackendConnection = async () => {
-    try {
-      const response = await api.get('/api/test');
-      console.log('Backend connection successful:', response.data);
-    } catch (error) {
-      console.error('Backend connection failed:', error);
-      alert('Backend server is not running. Please start the backend server first.');
+    if (studentData?.studentId) {
+      fetchCertificates();
     }
-  };
+  }, [studentData?.studentId]);
 
   const fetchCertificates = async () => {
     try {
+      setLoadingCertificates(true);
+      setStatusMessage({ type: '', text: '' });
       const response = await api.get(`/api/certificates/${studentData.studentId}`);
-      setCertificates(response.data);
+      setCertificates(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Error fetching certificates:', error);
+      setStatusMessage({ type: 'error', text: 'Unable to load certificates right now.' });
+    } finally {
+      setLoadingCertificates(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSavingCertificate(true);
+    setStatusMessage({ type: '', text: '' });
     try {
-      console.log('Submitting certificate data:', formData);
-      console.log('API base URL:', api.defaults.baseURL);
-      
       const formDataToSend = new FormData();
       formDataToSend.append('name', formData.name);
       if (formData.image) {
@@ -59,18 +57,21 @@ const PersonalAchievements = ({ studentData }) => {
       formDataToSend.append('issuer', formData.issuer);
       formDataToSend.append('studentId', studentData.studentId);
       
-      console.log('Making request to:', `${api.defaults.baseURL}/api/certificates`);
-      const response = await api.post('/api/certificates', formDataToSend, {
+      await api.post('/api/certificates', formDataToSend, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      console.log('Certificate saved:', response.data);
       setFormData({ name: '', image: null, url: '', date: '', category: '', issuer: '' });
       setShowForm(false);
-      fetchCertificates();
+      await fetchCertificates();
+      setStatusMessage({ type: 'success', text: 'Certificate added successfully.' });
     } catch (error) {
-      console.error('Full error object:', error);
-      console.error('Error response:', error.response);
-      alert('Error adding certificate: ' + (error.response?.data?.error || error.message));
+      console.error('Error adding certificate:', error);
+      setStatusMessage({
+        type: 'error',
+        text: error.response?.data?.error || 'Unable to add certificate right now.',
+      });
+    } finally {
+      setSavingCertificate(false);
     }
   };
 
@@ -86,11 +87,13 @@ const PersonalAchievements = ({ studentData }) => {
     if (deleteInput === 'Delete') {
       try {
         await api.delete(`/api/certificates/${studentData.studentId}/${deleteConfirm.certId}`);
-        fetchCertificates();
+        await fetchCertificates();
         setDeleteConfirm({ show: false, certId: null });
         setDeleteInput('');
+        setStatusMessage({ type: 'success', text: 'Certificate deleted successfully.' });
       } catch (error) {
         console.error('Error deleting certificate:', error);
+        setStatusMessage({ type: 'error', text: 'Unable to delete certificate right now.' });
       }
     }
   };
@@ -128,6 +131,17 @@ const PersonalAchievements = ({ studentData }) => {
       </nav>
 
       <div className="container mx-auto p-6">
+        {statusMessage.text && (
+          <div
+            className={`mb-4 rounded-lg border px-4 py-3 text-sm font-medium ${
+              statusMessage.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : 'bg-red-50 border-red-200 text-red-700'
+            }`}
+          >
+            {statusMessage.text}
+          </div>
+        )}
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold">My Certificates</h2>
           <button
@@ -196,9 +210,10 @@ const PersonalAchievements = ({ studentData }) => {
               <div className="flex space-x-2">
                 <button
                   type="submit"
+                  disabled={savingCertificate}
                   className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
                 >
-                  Add Certificate
+                  {savingCertificate ? 'Adding...' : 'Add Certificate'}
                 </button>
                 <button
                   type="button"
@@ -212,6 +227,9 @@ const PersonalAchievements = ({ studentData }) => {
           </div>
         )}
 
+        {loadingCertificates ? (
+          <div className="text-center py-10 text-gray-500">Loading certificates...</div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {certificates.map((cert) => (
             <div key={cert._id} className="bg-white rounded-lg shadow p-4 relative cursor-pointer hover:shadow-lg transition-shadow">
@@ -267,6 +285,7 @@ const PersonalAchievements = ({ studentData }) => {
             </div>
           ))}
         </div>
+        )}
 
         {selectedCertificate && (
           <div className="fixed inset-0 backdrop-blur-lg bg-gradient-to-br from-blue-100/30 via-purple-100/20 to-pink-100/30 flex items-center justify-center z-50 animate-fadeIn" onClick={() => setSelectedCertificate(null)}>
@@ -385,7 +404,7 @@ const PersonalAchievements = ({ studentData }) => {
           </div>
         )}
 
-        {certificates.length === 0 && !showForm && (
+        {certificates.length === 0 && !showForm && !loadingCertificates && (
           <div className="text-center py-12">
             <p className="text-gray-500 text-lg">No certificates added yet.</p>
             <button

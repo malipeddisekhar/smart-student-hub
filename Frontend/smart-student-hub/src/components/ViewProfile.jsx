@@ -7,39 +7,43 @@ const ViewProfile = ({ studentData }) => {
   const [profile, setProfile] = useState({});
   const [fullStudentData, setFullStudentData] = useState(studentData);
   const [selectedImage, setSelectedImage] = useState(null);
-
-  const backendUrl = import.meta.env.VITE_API_URL;
+  const [studentGroups, setStudentGroups] = useState([]);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [profileError, setProfileError] = useState('');
 
   useEffect(() => {
-    fetchProfile();
-    fetchFullStudentData();
-  }, []);
+    if (!studentData?.studentId) return;
 
-  const fetchProfile = async () => {
-    try {
-      const response = await api.get(`/api/profile/${studentData.studentId}`);
-      setProfile(response.data);
-    } catch (error) {
-      console.error("Error fetching profile:", error);
-    }
-  };
+    fetchProfileData();
+    const onFocus = () => fetchProfileData();
+    window.addEventListener('focus', onFocus);
 
-  const fetchFullStudentData = async () => {
+    return () => {
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [studentData?.studentId]);
+
+  const fetchProfileData = async () => {
     try {
-      const response = await api.get(`/api/students/${studentData.studentId}`);
-      console.log("Full student data from DB:", response.data);
-      console.log("College:", response.data.college);
-      console.log("Department:", response.data.department);
-      console.log("Year:", response.data.year);
-      console.log("Semester:", response.data.semester);
-      console.log("Roll Number:", response.data.rollNumber);
-      setFullStudentData(response.data);
+      setLoadingProfile(true);
+      setProfileError('');
+      const [profileRes, studentRes, groupsRes] = await Promise.all([
+        api.get(`/api/profile/${studentData.studentId}`),
+        api.get(`/api/students/${studentData.studentId}`),
+        api.get(`/api/student/groups/${studentData.studentId}`),
+      ]);
+
+      setProfile(profileRes.data || {});
+      setFullStudentData(studentRes.data || studentData);
+      setStudentGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
     } catch (error) {
-      console.error("Error fetching student data:", error);
-      // Fallback: use studentData if available
+      console.error('Error fetching profile data:', error);
+      setProfileError('Unable to fetch the latest profile details.');
       if (studentData && (studentData.college || studentData.department)) {
         setFullStudentData(studentData);
       }
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
@@ -66,6 +70,18 @@ const ViewProfile = ({ studentData }) => {
       </nav>
 
       <div className="container mx-auto p-6">
+        {loadingProfile && (
+          <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
+            Loading latest profile data...
+          </div>
+        )}
+
+        {profileError && (
+          <div className="mb-4 rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+            {profileError}
+          </div>
+        )}
+
         <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-white/20">
           <div className="text-center mb-8">
               {profile.profileImage ? (
@@ -121,6 +137,13 @@ const ViewProfile = ({ studentData }) => {
               <h3 className="font-semibold text-gray-700 mb-2">Roll Number</h3>
               <p className="text-cyan-600 font-medium">
                 {fullStudentData?.rollNumber || profile?.rollNumber || studentData?.rollNumber || '—'}
+              </p>
+            </div>
+
+            <div className="bg-gradient-to-r from-violet-50 to-fuchsia-50 p-4 rounded-xl">
+              <h3 className="font-semibold text-gray-700 mb-2">Assigned Groups</h3>
+              <p className="text-violet-600 font-medium">
+                {studentGroups.length > 0 ? studentGroups.map((group) => group.name).join(', ') : 'No groups assigned'}
               </p>
             </div>
 
@@ -356,102 +379,6 @@ const ViewProfile = ({ studentData }) => {
             )}
           </div>
         </div>
-          {/* <div className="mt-8">
-            <h3 className="text-2xl font-bold mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              Academic Records
-            </h3>
-            <div className="bg-gradient-to-br from-white to-orange-50 p-6 rounded-2xl shadow-lg border border-orange-100 mb-8">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center mr-4">
-                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-gray-800">Academic Performance</h4>
-                  <p className="text-orange-600 font-medium">CGPA: {fullStudentData.cgpa || 'N/A'}</p>
-                </div>
-              </div>
-              {fullStudentData.semesterMarks?.length > 0 ? (
-                <div className="grid gap-4">
-                  {fullStudentData.semesterMarks.map((record, index) => (
-                    <div key={index} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                      <div className="flex justify-between items-center">
-                        <h5 className="text-lg font-bold text-gray-800">
-                          Sem {record.semester} - Year {record.year}
-                        </h5>
-                        <span className="bg-orange-100 text-orange-800 px-3 py-2 rounded-full font-bold">
-                          SGPA: {record.sgpa}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-lg font-semibold text-gray-600 mb-2">No academic records found</p>
-                  <p className="text-gray-500">Your semester marks will appear here once added by your teacher.</p>
-                </div>
-              )}
-            </div>
-          </div> */}
-
-          <div className="mt-8">
-            <h3 className="text-2xl font-bold mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-              Academic Records
-            </h3>
-            <div className="bg-gradient-to-br from-white to-orange-50 p-6 rounded-2xl shadow-lg border border-orange-100 mb-8">
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center mr-4">
-                  <svg
-                    className="w-6 h-6 text-white"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-xl font-bold text-gray-800">
-                    Academic Performance
-                  </h4>
-                  <p className="text-orange-600 font-medium">
-                    CGPA: {fullStudentData.cgpa || "N/A"}
-                  </p>
-                </div>
-              </div>
-              {fullStudentData.semesterMarks?.length > 0 ? (
-                <div className="grid gap-4">
-                  {fullStudentData.semesterMarks.map((record, index) => (
-                    <div
-                      key={index}
-                      className="bg-white p-4 rounded-xl shadow-sm border border-gray-100"
-                    >
-                      <div className="flex justify-between items-center">
-                        <h5 className="text-lg font-bold text-gray-800">
-                          Sem {record.semester} - Year {record.year}
-                        </h5>
-                        <span className="bg-orange-100 text-orange-800 px-3 py-2 rounded-full font-bold">
-                          SGPA: {record.sgpa}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-lg font-semibold text-gray-600 mb-2">
-                    No academic records found
-                  </p>
-                  <p className="text-gray-500">
-                    Your semester marks will appear here once added by your
-                    teacher.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
           <div className="mt-8">
             <h3 className="text-2xl font-bold mb-6 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
               Skills & Certifications

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
@@ -9,20 +9,88 @@ const TeacherRegister = ({ onRegister }) => {
     email: '',
     phoneNumber: '',
     department: '',
-    college: '',
+    college: 'gmrit',
     designation: 'Assistant Professor',
     experience: 0,
     password: '',
     confirmPassword: ''
   });
   const [error, setError] = useState('');
-  // Removed dropdown-related state and effects; using text inputs instead
+  const [colleges, setColleges] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [loadingColleges, setLoadingColleges] = useState(true);
+
+  // Fetch colleges and departments from database
+  useEffect(() => {
+    const fetchCollegesAndDepartments = async () => {
+      try {
+        setLoadingColleges(true);
+        // Fetch all students and teachers to get available colleges/departments
+        const [studentsRes, teachersRes] = await Promise.all([
+          api.get('/api/admin/students'),
+          api.get('/api/admin/teachers')
+        ]);
+
+        const students = Array.isArray(studentsRes.data) ? studentsRes.data : [];
+        const teachers = Array.isArray(teachersRes.data) ? teachersRes.data : [];
+
+        // Extract only gmrit (uppercase, deduplicate)
+        const collegeSet = new Set(['gmrit']);
+        setColleges(['gmrit']);
+
+        // Extract unique departments (uppercase, deduplicate by uppercase version)
+        const deptMap = new Map();
+        students.forEach(s => {
+          if (s.department) {
+            const upperDept = String(s.department).trim().toUpperCase();
+            if (!deptMap.has(upperDept)) {
+              deptMap.set(upperDept, upperDept);
+            }
+          }
+        });
+        teachers.forEach(t => {
+          if (t.department) {
+            const upperDept = String(t.department).trim().toUpperCase();
+            if (!deptMap.has(upperDept)) {
+              deptMap.set(upperDept, upperDept);
+            }
+          }
+        });
+
+        setDepartments(Array.from(deptMap.values()).sort());
+        setLoadingColleges(false);
+      } catch (err) {
+        console.error('Error fetching colleges/departments:', err);
+        setLoadingColleges(false);
+      }
+    };
+
+    fetchCollegesAndDepartments();
+  }, []);
+
+  // Filter departments based on selected college
+  const filteredDepartments = formData.college
+    ? departments.filter(dept => {
+        // Show departments that match this college in the database
+        return true; // All departments are available for selected college
+      })
+    : [];
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    const { name, value } = e.target;
+    if (name === 'college') {
+      // Auto-set to gmrit if not set
+      setFormData({
+        ...formData,
+        [name]: 'gmrit',
+        department: ''
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value
+      });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -37,25 +105,25 @@ const TeacherRegister = ({ onRegister }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center py-8">
-      <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl p-8 w-full max-w-2xl border border-white/20">
-        <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50 flex items-center justify-center py-4 px-3 sm:py-8 sm:px-4">
+      <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl p-5 sm:p-8 w-full max-w-2xl border border-white/20">
+        <div className="text-center mb-6 sm:mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
             Teacher Registration
           </h2>
-          <p className="text-gray-600 mt-2">Join our educational platform</p>
+          <p className="text-sm sm:text-base text-gray-600 mt-2">Join our educational platform</p>
         </div>
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-3 sm:px-4 py-2 sm:py-3 rounded mb-4 text-sm sm:text-base">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
                 Full Name
               </label>
               <input
@@ -100,28 +168,29 @@ const TeacherRegister = ({ onRegister }) => {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 College/Institution
               </label>
-              <input
-                type="text"
-                name="college"
-                value={formData.college}
-                onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                required
-              />
+              <div className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 text-gray-900 font-semibold">
+                gmrit
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Department
               </label>
-              <input
-                type="text"
+              <select
                 name="department"
                 value={formData.department}
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 required
-              />
+              >
+                <option value="">-- Select Department --</option>
+                {departments.map((dept) => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

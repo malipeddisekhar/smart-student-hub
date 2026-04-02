@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../services/api";
@@ -13,7 +13,7 @@ const backendUrl = import.meta.env.VITE_API_URL;
     if (s.startsWith('/')) return backendBase.replace(/\/$/, '') + s;
     return s;
   };
-const TeacherDashboard = ({ teacherData, onLogout }) => {
+const TeacherDashboard = ({ teacherData, onLogout, onTeacherUpdate }) => {
   const navigate = useNavigate();
   const [backendStatus, setBackendStatus] = useState("Connecting...");
   const [showNotification, setShowNotification] = useState(false);
@@ -61,6 +61,15 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
 
   // Certificate review stats
   const [certStats, setCertStats] = useState({ approved: 0, rejected: 0, total: 0 });
+  const [teacherProfileForm, setTeacherProfileForm] = useState({
+    name: '',
+    email: '',
+    department: '',
+    college: '',
+    designation: '',
+    experience: 0,
+  });
+  const [savingTeacherProfile, setSavingTeacherProfile] = useState(false);
 
   // Dark mode state
   const [dark, setDark] = useState(() => {
@@ -69,84 +78,75 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
   useEffect(() => { localStorage.setItem('teacher-dark-mode', JSON.stringify(dark)); }, [dark]);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const response = await api.get("/api/test");
-        setBackendStatus(response.data.message);
-
-        const groupsRes = await api.get(
-          `/api/teacher/groups/${teacherData.teacherId}`
-        );
-        setGroups(groupsRes.data);
-
-        const studentsRes = await api.get("/api/admin/students");
-        const allStudents = studentsRes.data;
-
-        const teacherStudents = [];
-        for (const group of groupsRes.data) {
-          for (const studentId of group.students) {
-            const student = allStudents.find((s) => s.studentId === studentId);
-            if (student) {
-              // Fetch complete student data including marks
-              try {
-                const [certsRes, projectsRes, studentRes] = await Promise.all([
-                  api.get(`/api/certificates/${studentId}`),
-                  api.get(`/api/projects/${studentId}`),
-                  api.get(`/api/students/${studentId}`),
-                ]);
-                const completeStudent = studentRes.data;
-                completeStudent.personalCertificates = certsRes.data;
-                completeStudent.projects = projectsRes.data;
-
-                // Ensure marks data is properly set
-                if (!completeStudent.semesterMarks) {
-                  completeStudent.semesterMarks = [];
-                }
-                if (!completeStudent.cgpa) {
-                  completeStudent.cgpa = 0;
-                }
-
-                console.log(
-                  `Student ${studentId} marks:`,
-                  completeStudent.semesterMarks?.length || 0,
-                  "CGPA:",
-                  completeStudent.cgpa
-                );
-                teacherStudents.push({
-                  ...completeStudent,
-                  groupName: group.name,
-                });
-              } catch (error) {
-                console.error("Error fetching student data:", error);
-                student.personalCertificates = [];
-                student.projects = [];
-                student.semesterMarks = [];
-                student.cgpa = 0;
-                teacherStudents.push({ ...student, groupName: group.name });
-              }
-            }
-          }
-        }
-
-        setStudents(teacherStudents);
-        
-        // Fetch pending academic certificates
-        const certsRes = await api.get('/api/review/academic-certificates');
-        setPendingCertificates(certsRes.data);
-
-        // Fetch teacher's certificate review stats
-        try {
-          const statsRes = await api.get(`/api/teacher/certificate-stats/${teacherData.teacherId}`);
-          setCertStats(statsRes.data);
-        } catch (e) {
-          console.error('Error fetching cert stats:', e);
-        }
-      } catch (error) {
-        setBackendStatus("Backend connection failed");
-      }
-    };
-    fetchData();
+    setTeacherProfileForm({
+      name: teacherData?.name || '',
+      email: teacherData?.email || '',
+      department: teacherData?.department || '',
+      college: teacherData?.college || '',
+      designation: teacherData?.designation || 'Assistant Professor',
+      experience: teacherData?.experience || 0,
+    });
   }, [teacherData]);
+
+  const fetchDashboardData = useCallback(async () => {
+    if (!teacherData?.teacherId) {
+      setGroups([]);
+      setStudents([]);
+      setPendingCertificates([]);
+      setCertStats({ approved: 0, rejected: 0, total: 0 });
+      return;
+    }
+
+    try {
+      const [testRes, groupsRes, teacherStudentsRes, certsRes, statsRes] = await Promise.all([
+        api.get('/api/test'),
+        api.get(`/api/teacher/groups/${teacherData.teacherId}`),
+        api.get(`/api/teacher/students/${teacherData.teacherId}`),
+        api.get('/api/review/academic-certificates', { params: { teacherId: teacherData.teacherId } }),
+        api.get(`/api/teacher/certificate-stats/${teacherData.teacherId}`)
+          .catch(() => ({ data: { approved: 0, rejected: 0, total: 0, recentReviews: [] } })),
+      ]);
+
+      setBackendStatus(testRes.data?.message || 'Connected');
+      setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
+      setStudents(Array.isArray(teacherStudentsRes.data) ? teacherStudentsRes.data : []);
+      setPendingCertificates(Array.isArray(certsRes.data) ? certsRes.data : []);
+      setCertStats(statsRes.data || { approved: 0, rejected: 0, total: 0, recentReviews: [] });
+    } catch (error) {
+      setBackendStatus("Backend connection failed");
+    }
+  }, [teacherData?.teacherId]);
+
+  useEffect(() => {
+    fetchDashboardData();
+
+    const intervalId = setInterval(fetchDashboardData, 10000);
+    const onFocus = () => fetchDashboardData();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [fetchDashboardData]);
+
+  const handleSaveTeacherProfile = async () => {
+    if (!teacherData?.teacherId) return;
+
+    try {
+      setSavingTeacherProfile(true);
+      const response = await api.put(`/api/teacher/profile/${teacherData.teacherId}`, teacherProfileForm);
+      if (typeof onTeacherUpdate === 'function') {
+        onTeacherUpdate(response.data);
+      }
+      alert('Profile updated successfully');
+      await fetchDashboardData();
+    } catch (error) {
+      alert('Failed to update profile: ' + (error.response?.data?.error || error.message));
+    } finally {
+      setSavingTeacherProfile(false);
+    }
+  };
 
   const handleLogout = () => {
     onLogout();
@@ -488,7 +488,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                           <div>
                             <h4 className="font-semibold text-lg">{group.name}</h4>
                             <p className={`${dark ? "text-gray-400" : "text-gray-600"}`}>
-                              Students: {group.students.length}
+                              Students: {group.studentCount ?? group.students?.length ?? 0}
                             </p>
                           </div>
                           <button
@@ -540,6 +540,12 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                               <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
                                 {student.groupName}
                               </span>
+                            </div>
+
+                            <div className="mb-4">
+                              <p className={`text-xs font-medium ${dark ? "text-gray-400" : "text-gray-500"}`}>
+                                Assigned Groups: {student.groupCount ?? student.groups?.length ?? 0}
+                              </p>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
@@ -1551,6 +1557,12 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                     <span className="text-sm font-medium text-yellow-700">{pendingCertificates.length} Pending Reviews</span>
                   </div>
                 </div>
+
+                <div className={`mb-4 px-4 py-3 rounded-xl border ${dark ? 'bg-blue-500/10 border-blue-400/20 text-blue-200' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
+                  <p className="text-sm font-medium">
+                    Showing certificates for my allotted students only. Certificates appear dynamically based on admin group assignments.
+                  </p>
+                </div>
                 
                 {pendingCertificates.length === 0 ? (
                   <div className="text-center py-12">
@@ -1749,23 +1761,70 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Name</label>
-                      <input type="text" defaultValue={teacherData?.name} className="w-full p-3 border rounded-lg" />
+                      <input
+                        type="text"
+                        value={teacherProfileForm.name}
+                        onChange={(e) => setTeacherProfileForm((prev) => ({ ...prev, name: e.target.value }))}
+                        className="w-full p-3 border rounded-lg"
+                      />
                     </div>
                     <div>
                       <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Teacher ID</label>
-                      <input type="text" defaultValue={teacherData?.teacherId} className="w-full p-3 border rounded-lg" disabled />
+                      <input type="text" value={teacherData?.teacherId || ''} className="w-full p-3 border rounded-lg" disabled />
                     </div>
                     <div>
                       <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Email</label>
-                      <input type="email" defaultValue={teacherData?.email} className="w-full p-3 border rounded-lg" />
+                      <input
+                        type="email"
+                        value={teacherProfileForm.email}
+                        onChange={(e) => setTeacherProfileForm((prev) => ({ ...prev, email: e.target.value }))}
+                        className="w-full p-3 border rounded-lg"
+                      />
                     </div>
                     <div>
                       <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Department</label>
-                      <input type="text" defaultValue={teacherData?.department} className="w-full p-3 border rounded-lg" />
+                      <input
+                        type="text"
+                        value={teacherProfileForm.department}
+                        onChange={(e) => setTeacherProfileForm((prev) => ({ ...prev, department: e.target.value }))}
+                        className="w-full p-3 border rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>College</label>
+                      <input
+                        type="text"
+                        value={teacherProfileForm.college}
+                        onChange={(e) => setTeacherProfileForm((prev) => ({ ...prev, college: e.target.value }))}
+                        className="w-full p-3 border rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Designation</label>
+                      <input
+                        type="text"
+                        value={teacherProfileForm.designation}
+                        onChange={(e) => setTeacherProfileForm((prev) => ({ ...prev, designation: e.target.value }))}
+                        className="w-full p-3 border rounded-lg"
+                      />
+                    </div>
+                    <div>
+                      <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>Experience (Years)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={teacherProfileForm.experience}
+                        onChange={(e) => setTeacherProfileForm((prev) => ({ ...prev, experience: e.target.value }))}
+                        className="w-full p-3 border rounded-lg"
+                      />
                     </div>
                   </div>
-                  <button className="mt-4 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700">
-                    Save Changes
+                  <button
+                    onClick={handleSaveTeacherProfile}
+                    disabled={savingTeacherProfile}
+                    className="mt-4 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-60"
+                  >
+                    {savingTeacherProfile ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -1928,6 +1987,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                     for (const student of bulkMarksData.students) {
                       if (student.sgpa && parseFloat(student.sgpa) > 0) {
                         const marksData = {
+                          teacherId: teacherData.teacherId,
                           semester: parseInt(bulkMarksData.semester),
                           year: parseInt(bulkMarksData.year),
                           sgpa: parseFloat(student.sgpa),
@@ -1954,7 +2014,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                         `Marks saved successfully for ${savedCount} students!`
                       );
                       setShowBulkMarks(false);
-                      window.location.reload();
+                      await fetchDashboardData();
                     } else {
                       alert("No marks were saved. Please check SGPA values.");
                     }
@@ -2046,6 +2106,7 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                     const response = await api.put(
                       `/api/teacher/marks/${selectedStudent.studentId}`,
                       {
+                        teacherId: teacherData.teacherId,
                         semester: parseInt(editForm.semester),
                         year: parseInt(editForm.year),
                         sgpa: parseFloat(editForm.sgpa),
@@ -2053,7 +2114,8 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                     );
                     alert("SGPA updated successfully!");
                     setEditingMark(null);
-                    window.location.reload();
+                    await fetchDashboardData();
+                    setViewMode("list");
                   } catch (error) {
                     alert(
                       "Error updating SGPA: " +
@@ -2135,7 +2197,9 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
                       setReviewingCert(null);
                       
                       // Refresh pending certificates and stats
-                      const certsRes = await api.get('/api/review/academic-certificates');
+                      const certsRes = await api.get('/api/review/academic-certificates', {
+                        params: { teacherId: teacherData.teacherId }
+                      });
                       setPendingCertificates(certsRes.data);
                       try {
                         const statsRes = await api.get(`/api/teacher/certificate-stats/${teacherData.teacherId}`);
@@ -2405,7 +2469,9 @@ const TeacherDashboard = ({ teacherData, onLogout }) => {
             
             // Refresh certificates to show updated scan status
             try {
-              const certsRes = await api.get('/api/review/academic-certificates');
+              const certsRes = await api.get('/api/review/academic-certificates', {
+                params: { teacherId: teacherData.teacherId }
+              });
               setPendingCertificates(certsRes.data);
             } catch (error) {
               console.error('Error refreshing certificates:', error);

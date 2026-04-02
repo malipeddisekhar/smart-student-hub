@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
-const CodeChefCard = ({ studentData }) => {
+const CodeChefCard = ({ studentData, dark = false }) => {
   const navigate = useNavigate();
   const [codechefUsername, setCodechefUsername] = useState("");
   const [inputValue, setInputValue] = useState("");
@@ -123,7 +123,11 @@ const CodeChefCard = ({ studentData }) => {
   };
 
   return (
-    <div className="group bg-white/60 backdrop-blur-2xl rounded-3xl shadow-xl p-8 border border-white/30 hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 hover:bg-white/80 relative overflow-hidden">
+    <div className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${
+      dark
+        ? 'bg-white/[0.04] border-white/10 hover:bg-white/[0.08]'
+        : 'bg-white/60 border-white/30 hover:bg-white/80'
+    }`}>
       <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-yellow-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
       <div className="relative z-10">
         <div className="flex items-center justify-between mb-6">
@@ -138,43 +142,43 @@ const CodeChefCard = ({ studentData }) => {
           </div>
           <button
             onClick={() => navigate("/leaderboard")}
-            className="text-amber-600 hover:text-amber-700 font-medium transition-colors"
+            className={`font-medium transition-colors ${dark ? 'text-amber-300 hover:text-amber-200' : 'text-amber-600 hover:text-amber-700'}`}
           >
             View Leaderboard →
           </button>
         </div>
 
-        <h3 className="text-xl font-bold mb-3 text-gray-800 group-hover:text-amber-700 transition-colors">
+        <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? 'text-gray-100 group-hover:text-amber-300' : 'text-gray-800 group-hover:text-amber-700'}`}>
           CodeChef Credentials
         </h3>
-        <p className="text-gray-600 mb-6">
+        <p className={`mb-6 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>
           Connect your CodeChef account and compete on the leaderboard
         </p>
 
         {/* Current Status */}
         {codechefUsername && !isEditing && (
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-2xl p-4 mb-6">
+          <div className={`rounded-2xl p-4 mb-6 border ${dark ? 'bg-emerald-500/10 border-emerald-400/30' : 'bg-gradient-to-br from-green-50 to-emerald-50 border-green-200'}`}>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <p className="text-sm text-gray-600">Current CodeChef Username</p>
-                <p className="text-lg font-bold text-gray-800">
+                <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Current CodeChef Username</p>
+                <p className={`text-lg font-bold ${dark ? 'text-gray-100' : 'text-gray-800'}`}>
                   {codechefUsername}
                 </p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-gray-600">Problems Solved</p>
+                <p className={`text-sm ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Problems Solved</p>
                 <p className="text-2xl font-bold text-amber-600">
                   {problemsSolved}
                 </p>
               </div>
             </div>
             {/* Last updated + refresh */}
-            <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
+            <div className={`flex items-center justify-between mb-3 text-xs ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
               <span>{lastUpdated ? `Updated ${timeAgo(lastUpdated)}` : ''}</span>
               <button
                 onClick={handleRefresh}
                 disabled={refreshing}
-                className="flex items-center gap-1 text-amber-600 hover:text-amber-700 font-medium disabled:opacity-50"
+                className={`flex items-center gap-1 font-medium disabled:opacity-50 ${dark ? 'text-amber-300 hover:text-amber-200' : 'text-amber-600 hover:text-amber-700'}`}
                 title="Refresh stats now"
               >
                 <svg className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -209,7 +213,7 @@ const CodeChefCard = ({ studentData }) => {
         {isEditing && (
           <form onSubmit={handleSubmit} className="space-y-4 mb-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className={`block text-sm font-medium mb-2 ${dark ? 'text-gray-300' : 'text-gray-700'}`}>
                 CodeChef Username
               </label>
               <input
@@ -220,9 +224,9 @@ const CodeChefCard = ({ studentData }) => {
                   setError("");
                 }}
                 placeholder="Enter your CodeChef username"
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:border-amber-500 transition-colors"
+                className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:border-amber-500 transition-colors ${dark ? 'border-white/20 bg-white/5 text-gray-100 placeholder-gray-400' : 'border-gray-300 bg-white text-gray-800'}`}
               />
-              <p className="text-xs text-gray-500 mt-2">
+              <p className={`text-xs mt-2 ${dark ? 'text-gray-400' : 'text-gray-500'}`}>
                 Your CodeChef username (case-sensitive)
               </p>
             </div>
@@ -313,7 +317,7 @@ const CodeChefCard = ({ studentData }) => {
                   setInputValue("");
                   setError("");
                 }}
-                className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-3 px-4 rounded-lg transition-all duration-300"
+                className={`flex-1 font-medium py-3 px-4 rounded-lg transition-all duration-300 ${dark ? 'bg-white/10 hover:bg-white/20 text-gray-100 border border-white/20' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}
               >
                 Cancel
               </button>

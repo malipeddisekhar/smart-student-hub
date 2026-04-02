@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
-const backendUrl = import.meta.env.VITE_API_URL;
 
 const StudentProfile = ({ studentData }) => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState({});
   const [selectedImage, setSelectedImage] = useState(null);
+  const [loadingProfile, setLoadingProfile] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [statusMessage, setStatusMessage] = useState({ type: '', text: '' });
+  const [removedCertificates, setRemovedCertificates] = useState([]);
   const [formData, setFormData] = useState({
     profileImage: null,
     aadharNumber: '',
@@ -23,35 +26,33 @@ const StudentProfile = ({ studentData }) => {
   });
 
   useEffect(() => {
-    fetchProfile();
-  }, []);
+    if (studentData?.studentId) {
+      fetchProfile();
+    }
+  }, [studentData?.studentId]);
 
   const fetchProfile = async () => {
     try {
-      console.log('Fetching profile for student:', studentData.studentId);
+      setLoadingProfile(true);
       const response = await api.get(`/api/profile/${studentData.studentId}`);
-      console.log('Profile data received:', response.data);
       setProfile(response.data);
-      setFormData({ ...formData, ...response.data });
+      setFormData((prev) => ({ ...prev, ...response.data }));
+      setRemovedCertificates([]);
     } catch (error) {
       console.error('Error fetching profile:', error);
       if (error.response?.status === 404) {
-        console.log('Profile not found, will create new one on first save');
+        setStatusMessage({ type: 'info', text: 'Profile not found yet. It will be created when you save.' });
       }
+    } finally {
+      setLoadingProfile(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setSavingProfile(true);
+    setStatusMessage({ type: '', text: '' });
     try {
-      console.log('Student Data:', studentData);
-      console.log('API Base URL:', api.defaults.baseURL);
-      console.log('Profile URL:', `/api/profile/${studentData.studentId}`);
-      
-      // Test backend connection first
-      await api.get('/api/test');
-      console.log('Backend connection successful');
-      
       const formDataToSend = new FormData();
       
       Object.keys(formData).forEach(key => {
@@ -59,29 +60,32 @@ const StudentProfile = ({ studentData }) => {
           formDataToSend.append(key, formData[key]);
         }
       });
+
+      removedCertificates.forEach((field) => {
+        formDataToSend.append(field, '__REMOVE__');
+      });
       
-      console.log('Making request to:', `${api.defaults.baseURL}/api/profile/${studentData.studentId}`);
-      const response = await api.put(`/api/profile/${studentData.studentId}`, formDataToSend, {
+      await api.put(`/api/profile/${studentData.studentId}`, formDataToSend, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
-      console.log('Profile update response:', response.data);
-      fetchProfile();
-      alert('Profile updated successfully!');
+      await fetchProfile();
+      setStatusMessage({ type: 'success', text: 'Profile updated successfully.' });
     } catch (error) {
-      console.error('Full error:', error);
-      console.error('Error response:', error.response);
-      if (error.response?.status === 404) {
-        alert('Backend server not running or endpoint not found. Please start the backend server.');
-      } else {
-        alert('Error updating profile: ' + (error.response?.data?.error || error.message));
-      }
+      console.error('Error updating profile:', error);
+      setStatusMessage({
+        type: 'error',
+        text: error.response?.data?.error || 'Unable to update profile right now.',
+      });
+    } finally {
+      setSavingProfile(false);
     }
   };
 
   const handleChange = (e) => {
     if (e.target.type === 'file') {
       setFormData({ ...formData, [e.target.name]: e.target.files[0] });
+      setRemovedCertificates((prev) => prev.filter((field) => field !== e.target.name));
     } else {
       setFormData({ ...formData, [e.target.name]: e.target.value });
     }
@@ -91,54 +95,68 @@ const StudentProfile = ({ studentData }) => {
     if (window.confirm('Are you sure you want to delete this certificate?')) {
       setProfile({ ...profile, [certName]: null });
       setFormData({ ...formData, [certName]: null });
+      setRemovedCertificates((prev) => (prev.includes(certName) ? prev : [...prev, certName]));
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       <nav className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-2xl border-b border-white/10">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+        <div className="w-full px-3 sm:px-4 lg:px-6 py-3 sm:py-4">
+          <div className="flex justify-between items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 flex-shrink-0 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd"/>
                 </svg>
               </div>
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-white via-blue-100 to-indigo-200 bg-clip-text text-transparent">Update Profile</h1>
+              <h1 className="text-base sm:text-lg lg:text-2xl font-bold bg-gradient-to-r from-white via-blue-100 to-indigo-200 bg-clip-text text-transparent truncate">Update Profile</h1>
             </div>
             <button 
               onClick={() => navigate('/dashboard')}
-              className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 px-6 py-2 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
+              className="flex-shrink-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 px-3 sm:px-6 py-2 rounded-lg sm:rounded-xl font-medium text-xs sm:text-sm transition-all duration-300 transform hover:scale-105 shadow-lg whitespace-nowrap"
             >
-              Back to Dashboard
+              Back
             </button>
           </div>
         </div>
       </nav>
 
-      <div className="container mx-auto px-6 py-8">
-        <div className="bg-white/70 backdrop-blur-2xl rounded-3xl shadow-2xl p-8 border border-white/30 relative overflow-hidden">
+      <div className="w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-8">
+        {statusMessage.text && (
+          <div
+            className={`mb-4 sm:mb-6 rounded-lg sm:rounded-xl border px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium ${
+              statusMessage.type === 'success'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : statusMessage.type === 'error'
+                ? 'bg-red-50 border-red-200 text-red-700'
+                : 'bg-blue-50 border-blue-200 text-blue-700'
+            }`}
+          >
+            {statusMessage.text}
+          </div>
+        )}
+        <div className="bg-white/70 backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-6 lg:p-8 border border-white/30 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/5 to-indigo-500/5"></div>
           <div className="relative z-10">
-            <div className="text-center mb-10">
-              <h2 className="text-4xl font-bold bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800 bg-clip-text text-transparent mb-4">Update Your Profile</h2>
-              <p className="text-gray-600 text-lg">Keep your information up to date for better experience</p>
+            <div className="text-center mb-6 sm:mb-10">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800 bg-clip-text text-transparent mb-2 sm:mb-4">Update Your Profile</h2>
+              <p className="text-gray-600 text-xs sm:text-sm lg:text-base">Keep your information up to date for better experience</p>
             </div>
             
-            <form onSubmit={handleSubmit} className="space-y-10">
+            <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8 lg:space-y-10">
               {/* Personal Information Section */}
-              <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-8 border border-white/40 shadow-lg">
-                <div className="flex items-center mb-6">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center mr-4">
-                    <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <div className="bg-white/60 backdrop-blur-xl rounded-xl sm:rounded-2xl p-4 sm:p-6 lg:p-8 border border-white/40 shadow-lg">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 flex-shrink-0 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg sm:rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
                     </svg>
                   </div>
-                  <h3 className="text-2xl font-bold text-gray-800">Personal Information</h3>
+                  <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-800">Personal Information</h3>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                   <div className="space-y-2">
                     <label className="block text-sm font-semibold text-gray-700">Profile Image</label>
                     <div className="relative">
@@ -331,13 +349,14 @@ const StudentProfile = ({ studentData }) => {
                 <div className="text-center">
                 <button
                   type="submit"
+                  disabled={savingProfile || loadingProfile}
                   className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-700 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-800 text-white py-4 px-12 rounded-2xl font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-2xl hover:shadow-3xl"
                 >
                   <div className="flex items-center space-x-3">
                     <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                     </svg>
-                    <span>Update Profile</span>
+                    <span>{savingProfile ? 'Saving...' : 'Update Profile'}</span>
                   </div>
                 </button>
               </div>

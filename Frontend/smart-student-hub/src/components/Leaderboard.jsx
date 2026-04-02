@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 
@@ -6,37 +6,93 @@ const Leaderboard = ({ studentData }) => {
   const navigate = useNavigate();
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [platform, setPlatform] = useState("leetcode");
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const [dark, setDark] = useState(() => {
     const saved = localStorage.getItem("leaderboard-dark-mode");
     return saved !== null ? saved === "true" : true; // default dark
   });
+
+  const platformMeta = {
+    leetcode: {
+      title: "LeetCode Leaderboard",
+      subtitle: "Top students by problems solved",
+      gradient: "from-orange-500 to-red-600",
+      usernameLabel: "LeetCode Username",
+      emptyLabel: "LeetCode",
+      linkPrefix: "https://leetcode.com/",
+    },
+    codechef: {
+      title: "CodeChef Leaderboard",
+      subtitle: "Top students by solved challenge count",
+      gradient: "from-amber-500 to-yellow-600",
+      usernameLabel: "CodeChef Username",
+      emptyLabel: "CodeChef",
+      linkPrefix: "https://www.codechef.com/users/",
+    },
+  };
+
+  const activeMeta = platformMeta[platform];
+  const getScore = (student) =>
+    platform === "leetcode"
+      ? student?.problemsSolved || 0
+      : student?.codechefProblemsSolved || 0;
+  const getUsername = (student) =>
+    platform === "leetcode"
+      ? student?.leetcodeUsername
+      : student?.codechefUsername;
+
+  const averageScore =
+    leaderboard.length > 0
+      ? Math.round(leaderboard.reduce((sum, s) => sum + getScore(s), 0) / leaderboard.length)
+      : 0;
+
+  const topThree = leaderboard.slice(0, 3);
+  const topScore = getScore(leaderboard[0]);
+  const nextPlatform = platform === "leetcode" ? "codechef" : "leetcode";
+
+  const motivationalQuote =
+    leaderboard.length > 0
+      ? `"Your campus champion solved ${topScore} problems. Consistency can put your name here next."`
+      : `"The board is waiting. Start your ${activeMeta.emptyLabel} journey and become your campus benchmark."`;
+
+  const interactivePrompt = leaderboard.length > 0
+    ? `Can you beat the current campus average of ${averageScore}?`
+    : `Be the first competitive student from your campus to enter this leaderboard.`;
+
+  const fetchLeaderboard = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      const endpoint = platform === "leetcode"
+        ? "/api/leaderboard/leetcode"
+        : "/api/leaderboard/codechef";
+      const response = await api.get(endpoint);
+      setLeaderboard(Array.isArray(response.data) ? response.data : []);
+      setError(null);
+      setLastSyncedAt(new Date());
+    } catch (err) {
+      console.error("Error fetching leaderboard:", err);
+      setError("Failed to load leaderboard. Please try again later.");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [platform]);
 
   useEffect(() => {
     localStorage.setItem("leaderboard-dark-mode", dark);
   }, [dark]);
 
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        setLoading(true);
-        const endpoint = platform === "leetcode" 
-          ? "/api/leaderboard/leetcode" 
-          : "/api/leaderboard/codechef";
-        const response = await api.get(endpoint);
-        setLeaderboard(response.data);
-        setError(null);
-      } catch (err) {
-        console.error("Error fetching leaderboard:", err);
-        setError("Failed to load leaderboard. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchLeaderboard();
-  }, [platform]);
+    fetchLeaderboard(false);
+  }, [fetchLeaderboard]);
 
   const handleLogout = () => {
     sessionStorage.removeItem("studentData");
@@ -103,10 +159,10 @@ const Leaderboard = ({ studentData }) => {
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className={`text-5xl font-bold bg-clip-text text-transparent mb-2 ${dark ? "bg-gradient-to-r from-white via-blue-200 to-indigo-300" : "bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800"}`}>
-                {platform === "leetcode" ? "LeetCode" : "CodeChef"} Leaderboard
+                {activeMeta.title}
               </h1>
               <p className={`text-lg ${dark ? "text-gray-400" : "text-gray-600"}`}>
-                Top students by problems solved
+                {activeMeta.subtitle}
               </p>
             </div>
             {/* Dark mode toggle for non-logged-in users (no navbar) */}
@@ -173,6 +229,91 @@ const Leaderboard = ({ studentData }) => {
               >
                 CodeChef
               </button>
+              <button
+                onClick={() => fetchLeaderboard(true)}
+                disabled={refreshing}
+                className={`px-4 py-3 rounded-xl font-semibold transition-all duration-300 border ${dark ? "border-white/15 text-gray-200 hover:bg-white/10" : "border-slate-200 text-slate-700 hover:bg-white"} disabled:opacity-60`}
+                title="Refresh leaderboard"
+              >
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
+            {lastSyncedAt && (
+              <p className={`mt-3 text-xs font-medium ${dark ? "text-gray-400" : "text-slate-500"}`}>
+                Last synced at {lastSyncedAt.toLocaleTimeString()}
+              </p>
+            )}
+          </div>
+
+          {/* Top 3 Spotlight */}
+          {topThree.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {topThree.map((student, i) => (
+                <div
+                  key={`spotlight-${student._id || student.studentId || i}`}
+                  className={`rounded-2xl p-4 border transition-all duration-300 ${
+                    i === 0
+                      ? dark
+                        ? "bg-yellow-500/10 border-yellow-400/30"
+                        : "bg-gradient-to-br from-yellow-50 to-orange-50 border-yellow-200"
+                      : dark
+                      ? "bg-white/[0.04] border-white/10"
+                      : "bg-white/70 border-white/40"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className={`text-xs uppercase tracking-[0.14em] font-bold ${dark ? "text-gray-400" : "text-slate-500"}`}>
+                      {i === 0 ? "Champion" : i === 1 ? "Runner Up" : "Third Place"}
+                    </p>
+                    <span className="text-lg">{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>
+                  </div>
+                  <p className={`mt-2 text-sm font-semibold truncate ${dark ? "text-gray-100" : "text-slate-800"}`}>
+                    {student.name}
+                  </p>
+                  <p className={`text-xs ${dark ? "text-gray-400" : "text-slate-500"}`}>{student.college || "-"}</p>
+                  <p className={`mt-3 text-2xl font-black ${platform === "leetcode" ? "text-orange-500" : "text-amber-500"}`}>
+                    {getScore(student)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Motivational Quote + Interactive Prompt */}
+          <div className={`mb-6 rounded-2xl border p-5 md:p-6 ${dark ? "bg-gradient-to-r from-slate-900/70 to-indigo-900/40 border-white/10" : "bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-100"}`}>
+            <p className={`text-sm uppercase tracking-[0.18em] font-bold ${dark ? "text-blue-300" : "text-blue-700"}`}>
+              Campus Competitive Pulse
+            </p>
+            <p className={`mt-2 text-base md:text-lg font-semibold leading-relaxed ${dark ? "text-gray-100" : "text-slate-800"}`}>
+              {motivationalQuote}
+            </p>
+            <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <p className={`${dark ? "text-gray-300" : "text-slate-600"}`}>
+                {interactivePrompt}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPlatform(nextPlatform)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${dark ? "bg-white/10 text-gray-100 hover:bg-white/20" : "bg-white text-slate-700 border border-blue-100 hover:bg-blue-50"}`}
+                >
+                  Explore {platformMeta[nextPlatform].emptyLabel}
+                </button>
+                {studentData ? (
+                  <button
+                    onClick={() => navigate("/dashboard")}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r ${activeMeta.gradient}`}
+                  >
+                    Improve My Rank
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => navigate("/")}
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold text-white bg-gradient-to-r ${activeMeta.gradient}`}
+                  >
+                    Join Competition
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -240,7 +381,7 @@ const Leaderboard = ({ studentData }) => {
                     <th className="px-6 py-4 text-left font-bold">Student Name</th>
                     <th className="px-6 py-4 text-left font-bold">College</th>
                     <th className="px-6 py-4 text-center font-bold">
-                      {platform === "leetcode" ? "LeetCode Username" : "CodeChef Username"}
+                      {activeMeta.usernameLabel}
                     </th>
                     <th className="px-6 py-4 text-center font-bold">
                       Problems Solved
@@ -312,27 +453,27 @@ const Leaderboard = ({ studentData }) => {
                           </td>
                           <td className="px-6 py-4 text-center">
                             {platform === "leetcode" ? (
-                              student.leetcodeUsername ? (
+                              getUsername(student) ? (
                                 <a
-                                  href={`https://leetcode.com/${student.leetcodeUsername}`}
+                                  href={`${activeMeta.linkPrefix}${getUsername(student)}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-orange-600 hover:text-orange-800 font-medium underline transition-colors"
                                 >
-                                  @{student.leetcodeUsername}
+                                  @{getUsername(student)}
                                 </a>
                               ) : (
                                 <span className="text-gray-400 text-sm">—</span>
                               )
                             ) : (
-                              student.codechefUsername ? (
+                              getUsername(student) ? (
                                 <a
-                                  href={`https://www.codechef.com/users/${student.codechefUsername}`}
+                                  href={`${activeMeta.linkPrefix}${getUsername(student)}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="text-amber-600 hover:text-amber-800 font-medium underline transition-colors"
                                 >
-                                  @{student.codechefUsername}
+                                  @{getUsername(student)}
                                 </a>
                               ) : (
                                 <span className="text-gray-400 text-sm">—</span>
@@ -341,40 +482,21 @@ const Leaderboard = ({ studentData }) => {
                           </td>
                           <td className="px-6 py-4 text-center">
                             <div className="flex items-center justify-center space-x-2">
-                              {platform === "leetcode" ? (
-                                student.problemsSolved > 0 ? (
-                                  <>
-                                    <span className="text-2xl font-bold text-orange-600">
-                                      {student.problemsSolved}
-                                    </span>
-                                    <svg
-                                      className="w-6 h-6 text-orange-600"
-                                      fill="currentColor"
-                                      viewBox="0 0 20 20"
-                                    >
-                                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                    </svg>
-                                  </>
-                                ) : (
-                                  <span className="text-gray-400 text-lg">—</span>
-                                )
+                              {getScore(student) > 0 ? (
+                                <>
+                                  <span className={`text-2xl font-bold ${platform === "leetcode" ? "text-orange-600" : "text-amber-600"}`}>
+                                    {getScore(student)}
+                                  </span>
+                                  <svg
+                                    className={`w-6 h-6 ${platform === "leetcode" ? "text-orange-600" : "text-amber-600"}`}
+                                    fill="currentColor"
+                                    viewBox="0 0 20 20"
+                                  >
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  </svg>
+                                </>
                               ) : (
-                                student.codechefProblemsSolved > 0 ? (
-                                  <>
-                                    <span className="text-2xl font-bold text-amber-600">
-                                      {student.codechefProblemsSolved}
-                                    </span>
-                                    <svg
-                                      className="w-6 h-6 text-amber-600"
-                                      fill="currentColor"
-                                      viewBox="0 0 20 20"
-                                    >
-                                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                    </svg>
-                                  </>
-                                ) : (
-                                  <span className="text-gray-400 text-lg">—</span>
-                                )
+                                <span className="text-gray-400 text-lg">—</span>
                               )}
                             </div>
                           </td>
@@ -399,7 +521,7 @@ const Leaderboard = ({ studentData }) => {
                             />
                           </svg>
                           <p className={`text-lg font-medium ${dark ? "text-gray-500" : "text-gray-500"}`}>
-                            No students have submitted {platform === "leetcode" ? "LeetCode" : "CodeChef"} credentials yet
+                            No students have submitted {activeMeta.emptyLabel} credentials yet
                           </p>
                           {studentData && (
                             <p className={`${dark ? "text-gray-600" : "text-gray-400"}`}>
@@ -431,16 +553,7 @@ const Leaderboard = ({ studentData }) => {
                     Average Problems
                   </p>
                   <p className={`text-3xl font-bold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
-                    {platform === "leetcode" 
-                      ? Math.round(
-                          leaderboard.reduce((sum, s) => sum + (s.problemsSolved || 0), 0) /
-                            leaderboard.length
-                        )
-                      : Math.round(
-                          leaderboard.reduce((sum, s) => sum + (s.codechefProblemsSolved || 0), 0) /
-                            leaderboard.length
-                        )
-                    }
+                    {averageScore}
                   </p>
                 </div>
                 <div className="text-center">
@@ -448,10 +561,7 @@ const Leaderboard = ({ studentData }) => {
                     Highest Score
                   </p>
                   <p className={`text-3xl font-bold ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
-                    {platform === "leetcode" 
-                      ? (leaderboard[0]?.problemsSolved || 0)
-                      : (leaderboard[0]?.codechefProblemsSolved || 0)
-                    }
+                    {getScore(leaderboard[0])}
                   </p>
                 </div>
               </div>
