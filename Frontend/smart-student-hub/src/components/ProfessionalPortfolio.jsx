@@ -1,10 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { generateWebTemplate } from '../utils/webPortfolioTemplates';
+import { applyResumeTemplate } from '../utils/resumeTemplates';
+
+const webTemplates = [
+  { id: 'default', name: 'Default Gradient' },
+  { id: 'minimalist', name: 'Minimalist Clean' },
+  { id: 'dark', name: 'Dark Mode Sleek' },
+  { id: 'terminal', name: 'Developer Terminal' },
+  { id: 'creative', name: 'Creative Masonry' },
+  { id: 'elegant', name: 'Elegant Serif' }
+];
+
+const resumeTemplatesList = [
+  { id: 'default', name: 'Default Sidebar' },
+  { id: 'minimalist', name: 'Minimalist Focused' },
+  { id: 'professional', name: 'Professional Columns' },
+  { id: 'executive', name: 'Executive Header' },
+  { id: 'modern', name: 'Modern Accent' },
+  { id: 'compact', name: 'Compact Dense' }
+];
 
 const ProfessionalPortfolio = ({ studentData }) => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('portfolio');
+  const [selectedWebTemplate, setSelectedWebTemplate] = useState('default');
+  const [selectedResumeTemplate, setSelectedResumeTemplate] = useState('default');
   const [profileData, setProfileData] = useState(null);
   const [fullStudentData, setFullStudentData] = useState(studentData);
   const [projects, setProjects] = useState([]);
@@ -406,7 +428,6 @@ const ProfessionalPortfolio = ({ studentData }) => {
       const doc = new jsPDF();
       const ed = portfolioEditorData;
       
-      // Safe access helpers - use fullStudentData which has complete info from DB
       const name = fullStudentData?.name || studentData?.name || 'Student';
       const department = fullStudentData?.department || studentData?.department || 'Department';
       const college = fullStudentData?.college || studentData?.college || 'College';
@@ -414,11 +435,23 @@ const ProfessionalPortfolio = ({ studentData }) => {
       const semester = fullStudentData?.semester || studentData?.semester || 'N/A';
       const headline = ed?.headline || `${department} Student`;
       
-      // Merged data
       const mergedSkills = ed?.customSkills?.length > 0 ? ed.customSkills : Object.keys(skills || {});
       const mergedProjects = ed?.customProjects?.length > 0 ? ed.customProjects : (projects || []);
       const editorEducation = ed?.education?.length > 0 ? ed.education : null;
       const editorExperience = ed?.experience || [];
+      const resumeInternships = (academicCertificates || []).filter(cert => cert && cert.status === 'approved' && cert.domain === 'internship');
+      const approvedCerts = (academicCertificates || []).filter(cert => cert && cert.status === 'approved');
+
+      if (selectedResumeTemplate !== 'default') {
+        applyResumeTemplate(doc, selectedResumeTemplate, {
+          name, headline, department, college, year, semester, profileData, ed, mergedSkills, mergedProjects, editorEducation, editorExperience, resumeInternships, approvedCerts
+        });
+        const safeName = name.replace(/[^a-z0-9-_. ]/gi, '_');
+        doc.save(`${safeName}_Professional_Resume.pdf`);
+        return;
+      }
+
+      
 
       // Colors
       const darkGray = [31, 41, 55];
@@ -652,7 +685,6 @@ const ProfessionalPortfolio = ({ studentData }) => {
       }
 
       // Certifications
-      const approvedCerts = (academicCertificates || []).filter(cert => cert && cert.status === 'approved');
       if (approvedCerts.length > 0) {
         doc.setFontSize(13);
         doc.setFont("helvetica", "bold");
@@ -699,6 +731,23 @@ const ProfessionalPortfolio = ({ studentData }) => {
     const editorExperience = ed?.experience || [];
     const editorAwards = ed?.awards || [];
     const aboutMe = ed?.aboutMe || `I am a dedicated ${department || 'technology'} student${college ? ` at ${college}` : ''}${year ? `, currently in year ${year}` : ''}${semester ? `, semester ${semester}` : ''}. ${profileData?.overallCGPA > 0 ? `I maintain a CGPA of ${profileData.overallCGPA}.` : ''} I am passionate about technology and continuously work on projects to enhance my skills.`;
+
+    if (selectedWebTemplate !== 'default') {
+      const portfolioHTML = generateWebTemplate(selectedWebTemplate, {
+        name, headline, college, department, year, semester, profileData, ed, aboutMe, mergedSkills, mergedProjects, safeAcademicCerts, editorEducation, editorExperience, editorAwards
+      });
+      
+      const blob = new Blob([portfolioHTML], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${name}_Web_Portfolio.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      return;
+    }
 
     const portfolioHTML = `
 <!DOCTYPE html>
@@ -1002,15 +1051,29 @@ const ProfessionalPortfolio = ({ studentData }) => {
                   <span>Generate PDF Portfolio</span>
                 </button>
 
-                <button
-                  onClick={generateWebPortfolio}
-                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white p-6 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-3"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
-                  </svg>
-                  <span>Generate Web Portfolio</span>
-                </button>
+                <div className="flex flex-col space-y-3">
+                  <div className="flex items-center space-x-2 px-2">
+                    <label className="text-gray-700 font-medium text-sm">Web Template:</label>
+                    <select 
+                      value={selectedWebTemplate} 
+                      onChange={(e) => setSelectedWebTemplate(e.target.value)}
+                      className="bg-white border border-gray-300 text-gray-700 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2 text-sm"
+                    >
+                      {webTemplates.map(t => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button
+                    onClick={generateWebPortfolio}
+                    className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white p-6 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-3 w-full"
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+                    </svg>
+                    <span>Generate Web Portfolio</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1054,10 +1117,22 @@ const ProfessionalPortfolio = ({ studentData }) => {
                 </div>
               </div>
 
-              <div className="text-center">
+              <div className="text-center max-w-md mx-auto">
+                <div className="mb-6 flex flex-col items-start text-left bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                  <label className="text-gray-700 font-bold mb-2">Select Resume Template</label>
+                  <select 
+                    value={selectedResumeTemplate} 
+                    onChange={(e) => setSelectedResumeTemplate(e.target.value)}
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-red-500 focus:border-red-500 block w-full p-2.5"
+                  >
+                    {resumeTemplatesList.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <button
                   onClick={generateResume}
-                  className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white p-6 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-3 mx-auto"
+                  className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white p-6 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-3 w-full"
                 >
                   <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />

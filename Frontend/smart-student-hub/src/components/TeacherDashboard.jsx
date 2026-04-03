@@ -156,10 +156,10 @@ const TeacherDashboard = ({ teacherData, onLogout, onTeacherUpdate }) => {
     <div className={`min-h-screen bg-gradient-to-br ${dark ? 'from-gray-950 via-slate-900 to-gray-900' : 'from-green-50 via-emerald-50 to-teal-50'}`}>
       <nav className={`${dark ? 'bg-gradient-to-r from-slate-900 via-gray-900 to-slate-800 border-b border-white/10' : 'bg-gradient-to-r from-green-600 to-emerald-600'} text-white p-4 shadow-lg`}>
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-green-100 bg-clip-text text-transparent">
+          <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-white to-green-100 bg-clip-text text-transparent truncate pr-2">
             Teacher Dashboard
           </h1>
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
             <div className="relative">
               <button
                 onClick={() => setShowNotification(!showNotification)}
@@ -191,38 +191,38 @@ const TeacherDashboard = ({ teacherData, onLogout, onTeacherUpdate }) => {
         </div>
       </nav>
 
-      <div className="container mx-auto p-6">
+      <div className="container mx-auto p-3 sm:p-6">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className={`backdrop-blur-xl rounded-2xl shadow-xl p-8 mb-8 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}
+          className={`backdrop-blur-xl rounded-2xl shadow-xl p-5 sm:p-8 mb-6 sm:mb-8 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}
         >
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-6">
-              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-lg">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-white text-xl sm:text-2xl font-bold shadow-lg flex-shrink-0">
                 {teacherData?.name?.charAt(0) || "T"}
               </div>
               <div>
-                <h2 className="text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-2">
+                <h2 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-1 sm:mb-2">
                   Welcome, {teacherData?.name || "Teacher"}!
                 </h2>
-                <p className={`text-lg ${dark ? "text-gray-400" : "text-gray-600"}`}>
+                <p className={`text-sm sm:text-lg ${dark ? "text-gray-400" : "text-gray-600"}`}>
                   Teacher ID: {teacherData?.teacherId}
                 </p>
               </div>
             </div>
             <button 
               onClick={() => setActiveTab('profile')}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg"
+              className="hidden md:block bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white px-6 py-3 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg"
             >
               Edit Profile
             </button>
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className={`backdrop-blur-xl rounded-2xl shadow-xl p-6 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }} className={`backdrop-blur-xl rounded-2xl shadow-xl p-4 sm:p-6 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center mb-4">
               <svg
                 className="w-6 h-6 text-white"
@@ -363,11 +363,11 @@ const TeacherDashboard = ({ teacherData, onLogout, onTeacherUpdate }) => {
               <table className="w-full text-left">
                 <thead className={`${dark ? "bg-white/5" : "bg-gray-50/80"}`}>
                   <tr>
-                    <th className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Student</th>
-                    <th className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Certificate</th>
-                    <th className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Status</th>
-                    <th className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Date</th>
-                    <th className={`px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Feedback</th>
+                    <th className={`px-3 sm:px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Student</th>
+                    <th className={`px-3 sm:px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Certificate</th>
+                    <th className={`px-3 sm:px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Status</th>
+                    <th className={`hidden sm:table-cell px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Date</th>
+                    <th className={`hidden md:table-cell px-6 py-3 text-xs font-semibold uppercase tracking-wider ${dark ? "text-gray-400" : "text-gray-500"}`}>Feedback</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${dark ? "divide-white/10" : "divide-gray-100"}`}>
@@ -415,16 +415,16 @@ const TeacherDashboard = ({ teacherData, onLogout, onTeacherUpdate }) => {
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.8 }} className="mt-8">
           <div className={`backdrop-blur-xl rounded-2xl shadow-xl p-8 border ${dark ? "bg-white/5 border-white/10" : "bg-white/80 border-white/20"}`}>
-            <div className="flex gap-4 mb-6 flex-wrap">
+            <div className="flex gap-2 sm:gap-4 mb-6 overflow-x-auto scrollbar-hide py-1">
 
 
               <button
                 onClick={() => setActiveTab("groups")}
                 className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
                   activeTab === "groups"
-                    ? "bg-green-600 text-white"
+                    ? "bg-green-600 text-white shadow-md scale-105"
                     : dark ? "bg-white/10 text-gray-300 hover:bg-white/20" : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                }`}
+                } text-xs sm:text-base whitespace-nowrap`}
               >
                 My Groups
               </button>

@@ -113,17 +113,17 @@ const LandingPage = () => {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-1.5 sm:space-x-2"
             >
               <button
                 onClick={() => navigate("/login")}
-                className="btn-ripple bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium"
+                className="btn-ripple bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium"
               >
                 Student
               </button>
               <button
                 onClick={() => navigate("/leaderboard")}
-                className="btn-ripple bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-xl text-sm font-medium shadow-md"
+                className="btn-ripple bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium shadow-md"
               >
                 Leaderboard
               </button>

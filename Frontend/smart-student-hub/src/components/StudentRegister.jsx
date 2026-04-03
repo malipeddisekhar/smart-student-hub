@@ -176,7 +176,7 @@ const StudentRegister = ({ onRegister }) => {
             className="w-full px-4 py-3 border rounded-xl"
           />
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <input
               name="password"
               type="password"
@@ -198,7 +198,7 @@ const StudentRegister = ({ onRegister }) => {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="px-4 py-3 border rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 text-gray-900 font-semibold">
               gmrit
             </div>
@@ -218,7 +218,7 @@ const StudentRegister = ({ onRegister }) => {
             </select>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <input
               name="year"
               type="number"

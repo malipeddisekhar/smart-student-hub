@@ -619,11 +619,11 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                   <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z"/>
                 </svg>
               </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              <div className="hidden sm:block truncate pr-2">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
                   Admin Dashboard
                 </h1>
-                <p className={`text-xs sm:text-sm ${dark ? 'text-gray-400' : 'text-gray-500'}`}>Manage your institution</p>
+                <p className={`text-xs sm:text-sm ${dark ? 'text-gray-400' : 'text-gray-500'}`}>Manage institution</p>
               </div>
             </div>
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -651,7 +651,7 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
               </button>
               <button 
                 onClick={onLogout} 
-                className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-2 sm:px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 text-sm sm:text-base"
+                className="bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600 text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-base font-medium transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
               >
                 <svg className="w-4 h-4 inline sm:mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z" clipRule="evenodd"/>
@@ -663,14 +663,14 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
         </div>
       </nav>
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6">
         {/* Modern Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
           <div className={`backdrop-blur-xl rounded-2xl p-4 sm:p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
             <div className="flex items-center justify-between gap-2 sm:gap-4">
               <div>
-                <p className={`text-xs sm:text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Total Students</p>
-                <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{totalStudents}</p>
+                <p className={`text-[10px] sm:text-sm font-medium mb-0.5 sm:mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Total Students</p>
+                <p className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">{totalStudents}</p>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl flex items-center justify-center flex-shrink-0">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -683,8 +683,8 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
           <div className={`backdrop-blur-xl rounded-2xl p-4 sm:p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
             <div className="flex items-center justify-between gap-2 sm:gap-4">
               <div>
-                <p className={`text-xs sm:text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Total Teachers</p>
-                <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">{totalTeachers}</p>
+                <p className={`text-[10px] sm:text-sm font-medium mb-0.5 sm:mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Total Teachers</p>
+                <p className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">{totalTeachers}</p>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-500 to-emerald-500 rounded-xl flex items-center justify-center flex-shrink-0">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -697,8 +697,8 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
           <div className={`backdrop-blur-xl rounded-2xl p-4 sm:p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
             <div className="flex items-center justify-between gap-2 sm:gap-4">
               <div>
-                <p className={`text-xs sm:text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Active Groups</p>
-                <p className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">{groups.length}</p>
+                <p className={`text-[10px] sm:text-sm font-medium mb-0.5 sm:mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>Active Groups</p>
+                <p className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">{groups.length}</p>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center flex-shrink-0">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -711,8 +711,8 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
           <div className={`backdrop-blur-xl rounded-2xl p-4 sm:p-6 border shadow-xl ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
             <div className="flex items-center justify-between gap-2 sm:gap-4">
               <div>
-                <p className={`text-xs sm:text-sm font-medium mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>System Status</p>
-                <p className="text-lg sm:text-2xl font-bold text-green-500">Online</p>
+                <p className={`text-[10px] sm:text-sm font-medium mb-0.5 sm:mb-1 ${dark ? 'text-gray-400' : 'text-gray-600'}`}>System Status</p>
+                <p className="text-sm sm:text-2xl font-bold text-green-500">Online</p>
               </div>
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-green-500 to-teal-500 rounded-xl flex items-center justify-center flex-shrink-0">
                 <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -726,7 +726,7 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
         {/* Modern Tab Navigation */}
         <div className={`backdrop-blur-xl rounded-2xl shadow-xl border overflow-hidden ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/20'}`}>
           <div className={`border-b ${dark ? 'border-white/10' : 'border-gray-200/50'}`}>
-            <nav className="flex space-x-2 sm:space-x-8 px-2 sm:px-6 overflow-x-auto">
+            <nav className="flex space-x-4 sm:space-x-8 px-4 sm:px-6 overflow-x-auto scrollbar-hide py-1 sm:py-0">
               {[
                 { key: 'overview', label: 'Personal Info', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
                 { key: 'students', label: 'Students', icon: 'M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z' },
@@ -748,7 +748,7 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
                   </svg>
                   <span className="hidden sm:inline">{tab.label}</span>
                   {tab.key === 'students' && (
-                    <span className={`px-2 py-0.5 text-xs rounded-full ${dark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
+                    <span className={`px-1.5 sm:px-2 py-0.5 text-[10px] sm:text-xs rounded-full ${dark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-700'}`}>
                       {totalStudents}
                     </span>
                   )}
@@ -773,13 +773,13 @@ const AdminDashboard = ({ adminData, onLogout, onAdminUpdate }) => {
           </div>
 
           {activeTab === 'overview' && (
-            <div className="p-8">
+            <div className="p-4 sm:p-8">
               <div className="max-w-4xl mx-auto">
-                <div className="text-center mb-8">
-                  <div className="w-24 h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span className="text-3xl font-bold text-white">{adminData?.name?.charAt(0)}</span>
+                <div className="text-center mb-6 sm:mb-8">
+                  <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                    <span className="text-xl sm:text-3xl font-bold text-white">{adminData?.name?.charAt(0)}</span>
                   </div>
-                  <h3 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
+                  <h3 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-1 sm:mb-2">
                     Admin Profile
                   </h3>
                   <p className={`${dark ? 'text-gray-400' : 'text-gray-600'}`}>Manage your administrative account</p>
