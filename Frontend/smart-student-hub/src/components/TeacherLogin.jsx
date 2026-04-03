@@ -132,6 +132,7 @@ const TeacherLogin = ({ onLogin }) => {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
+                autoComplete="email"
                 className="w-full px-4 py-3 bg-white/[0.06] border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300 placeholder-gray-500 text-sm text-white"
                 placeholder="Enter your email"
                 required
@@ -145,6 +146,7 @@ const TeacherLogin = ({ onLogin }) => {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
+                autoComplete="current-password"
                 className="w-full px-4 py-3 bg-white/[0.06] border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all duration-300 placeholder-gray-500 text-sm text-white"
                 placeholder="Enter your password"
                 required
@@ -193,15 +195,6 @@ const TeacherLogin = ({ onLogin }) => {
             </svg>
             <span>{isLoading ? 'Redirecting...' : 'Login with Outlook'}</span>
           </motion.button>
-
-          <div className="mt-6 text-center">
-            <button
-              onClick={() => navigate('/teacher/register')}
-              className="text-emerald-400 hover:text-emerald-300 font-medium text-sm transition-colors duration-200"
-            >
-              Don't have an account? Register here
-            </button>
-          </div>
 
           <div className="mt-3 text-center">
             <button

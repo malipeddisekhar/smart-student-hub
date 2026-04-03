@@ -26,10 +26,29 @@ const Dashboard = ({ studentData, onLogout }) => {
   });
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const socketRef = useRef(null);
+  const notificationRef = useRef(null);
+  const messagesRef = useRef(null);
   const [dark, setDark] = useState(() => {
     try { return JSON.parse(localStorage.getItem('student-dark-mode')) ?? true; } catch { return true; }
   });
   useEffect(() => { localStorage.setItem('student-dark-mode', JSON.stringify(dark)); }, [dark]);
+
+  // Handle click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotification(false);
+      }
+      if (messagesRef.current && !messagesRef.current.contains(event.target)) {
+        setShowMessages(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Notification type icon & color map
   const notifMeta = {
@@ -174,7 +193,7 @@ const Dashboard = ({ studentData, onLogout }) => {
   return (
     <div className={`min-h-screen bg-gradient-to-br ${dark ? 'from-gray-950 via-slate-900 to-gray-900' : 'from-slate-50 via-blue-50 to-indigo-100'}`}>
       <nav className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-2xl border-b border-white/10">
-        <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4">
+        <div className="container mx-auto px-6 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-4">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -186,12 +205,12 @@ const Dashboard = ({ studentData, onLogout }) => {
                   <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
                 </svg>
               </div>
-              <h1 className="hidden sm:block text-xl md:text-2xl font-bold bg-gradient-to-r from-white via-blue-100 to-indigo-200 bg-clip-text text-transparent">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-white via-blue-100 to-indigo-200 bg-clip-text text-transparent">
                 Smart Student Hub
               </h1>
             </div>
-            <div className="flex items-center space-x-1.5 sm:space-x-3">
-              <div className="relative">
+            <div className="flex items-center space-x-3">
+              <div className="relative" ref={messagesRef}>
                 <button
                   onClick={() => {
                     setShowMessages(!showMessages);
@@ -213,98 +232,8 @@ const Dashboard = ({ studentData, onLogout }) => {
                     </span>
                   )}
                 </button>
-                <button
-                  onClick={() => {
-                    setShowNotification(!showNotification);
-                    setShowMessages(false);
-                  }}
-                  className="relative bg-white/10 backdrop-blur-md hover:bg-white/20 p-3 rounded-xl transition-all duration-300 group border border-white/20"
-                >
-                  <svg
-                    className="w-5 h-5 text-white group-hover:scale-110 transition-transform"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                  </svg>
-                  {unreadNotifCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
-                      {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
-                    </span>
-                  )}
-                </button>
-                {showNotification && (
-                  <div className="absolute right-0 mt-3 w-[calc(100vw-2rem)] sm:w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-[28rem] overflow-hidden animate-slideUp">
-                    <div className="p-4 border-b border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-gray-800 text-lg">Notifications</h3>
-                        <div className="flex items-center space-x-2">
-                          {unreadNotifCount > 0 && (
-                            <button
-                              onClick={markAllNotificationsRead}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
-                            >
-                              Mark all read
-                            </button>
-                          )}
-                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                            {unreadNotifCount} new
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="max-h-80 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500">
-                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                            </svg>
-                          </div>
-                          <p className="font-medium">No notifications yet</p>
-                          <p className="text-sm text-gray-400 mt-1">You'll be notified about feedback, messages & more</p>
-                        </div>
-                      ) : (
-                        notifications.map((notif) => {
-                          const meta = notifMeta[notif.type] || notifMeta.system;
-                          return (
-                            <div
-                              key={notif._id}
-                              className={`p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-all duration-200 ${
-                                !notif.isRead ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500" : ""
-                              }`}
-                              onClick={() => {
-                                if (!notif.isRead) markNotificationRead(notif._id);
-                              }}
-                            >
-                              <div className="flex items-start space-x-3">
-                                <div className={`w-10 h-10 bg-gradient-to-br ${meta.color} rounded-full flex items-center justify-center text-white text-lg shadow-md flex-shrink-0`}>
-                                  {meta.icon}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{meta.label}</span>
-                                    <span className="text-xs text-gray-400">{timeAgo(notif.createdAt)}</span>
-                                  </div>
-                                  <p className="font-semibold text-gray-800 text-sm truncate">{notif.title}</p>
-                                  <p className="text-sm text-gray-600 line-clamp-2 mt-0.5">{notif.body}</p>
-                                  {notif.senderName && (
-                                    <p className="text-xs text-gray-400 mt-1">From: {notif.senderName}</p>
-                                  )}
-                                </div>
-                                {!notif.isRead && (
-                                  <span className="inline-block w-2.5 h-2.5 bg-blue-500 rounded-full mt-1 animate-pulse flex-shrink-0"></span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
                 {showMessages && (
-                  <div className="absolute right-0 mt-3 w-[calc(100vw-2rem)] sm:w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-96 overflow-hidden animate-slideUp">
+                  <div className="absolute right-0 mt-3 w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-96 overflow-hidden animate-slideUp">
                     <div className="p-6 border-b border-gray-100">
                       <div className="flex items-center justify-between">
                         <h3 className="font-bold text-gray-800 text-lg">
@@ -409,6 +338,98 @@ const Dashboard = ({ studentData, onLogout }) => {
                   </div>
                 )}
               </div>
+              <div className="relative" ref={notificationRef}>
+                <button
+                  onClick={() => {
+                    setShowNotification(!showNotification);
+                    setShowMessages(false);
+                  }}
+                  className="relative bg-white/10 backdrop-blur-md hover:bg-white/20 p-3 rounded-xl transition-all duration-300 group border border-white/20"
+                >
+                  <svg
+                    className="w-5 h-5 text-white group-hover:scale-110 transition-transform"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                  </svg>
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
+                      {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                    </span>
+                  )}
+                </button>
+                {showNotification && (
+                  <div className="absolute right-0 mt-3 w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-[28rem] overflow-hidden animate-slideUp">
+                    <div className="p-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-gray-800 text-lg">Notifications</h3>
+                        <div className="flex items-center space-x-2">
+                          {unreadNotifCount > 0 && (
+                            <button
+                              onClick={markAllNotificationsRead}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                            >
+                              Mark all read
+                            </button>
+                          )}
+                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                            {unreadNotifCount} new
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500">
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                            </svg>
+                          </div>
+                          <p className="font-medium">No notifications yet</p>
+                          <p className="text-sm text-gray-400 mt-1">You'll be notified about feedback, messages & more</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => {
+                          const meta = notifMeta[notif.type] || notifMeta.system;
+                          return (
+                            <div
+                              key={notif._id}
+                              className={`p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-all duration-200 ${
+                                !notif.isRead ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500" : ""
+                              }`}
+                              onClick={() => {
+                                if (!notif.isRead) markNotificationRead(notif._id);
+                              }}
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className={`w-10 h-10 bg-gradient-to-br ${meta.color} rounded-full flex items-center justify-center text-white text-lg shadow-md flex-shrink-0`}>
+                                  {meta.icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{meta.label}</span>
+                                    <span className="text-xs text-gray-400">{timeAgo(notif.createdAt)}</span>
+                                  </div>
+                                  <p className="font-semibold text-gray-800 text-sm truncate">{notif.title}</p>
+                                  <p className="text-sm text-gray-600 line-clamp-2 mt-0.5">{notif.body}</p>
+                                  {notif.senderName && (
+                                    <p className="text-xs text-gray-400 mt-1">From: {notif.senderName}</p>
+                                  )}
+                                </div>
+                                {!notif.isRead && (
+                                  <span className="inline-block w-2.5 h-2.5 bg-blue-500 rounded-full mt-1 animate-pulse flex-shrink-0"></span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => setDark(!dark)}
                 className="bg-white/10 backdrop-blur-md hover:bg-white/20 p-3 rounded-xl transition-all duration-300 border border-white/20"
@@ -422,7 +443,7 @@ const Dashboard = ({ studentData, onLogout }) => {
               </button>
               <button
                 onClick={handleLogout}
-                className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 px-3 sm:px-6 py-2 rounded-xl text-sm sm:text-base font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
+                className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 px-6 py-2 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
               >
                 Logout
               </button>
@@ -431,12 +452,12 @@ const Dashboard = ({ studentData, onLogout }) => {
         </div>
       </nav>
 
-      <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-8">
+      <div className="container mx-auto px-6 py-8">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className={`backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-8 mb-6 sm:mb-10 border relative overflow-hidden ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/30'}`}
+          className={`backdrop-blur-2xl rounded-3xl shadow-2xl p-8 mb-10 border relative overflow-hidden ${dark ? 'bg-white/5 border-white/10' : 'bg-white/70 border-white/30'}`}
         >
           <div className={`absolute inset-0 ${dark ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10' : 'bg-gradient-to-r from-blue-500/5 to-indigo-500/5'}`}></div>
           <div className="relative z-10">
@@ -469,7 +490,7 @@ const Dashboard = ({ studentData, onLogout }) => {
                   </div>
                 </div>
                 <div>
-                  <h2 className={`text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-3 ${dark ? 'from-white via-blue-200 to-indigo-300' : 'from-slate-800 via-blue-800 to-indigo-800'}`}>
+                  <h2 className={`text-4xl font-bold bg-gradient-to-r bg-clip-text text-transparent mb-3 ${dark ? 'from-white via-blue-200 to-indigo-300' : 'from-slate-800 via-blue-800 to-indigo-800'}`}>
                     Welcome back, {studentData?.name || "Student"}!
                   </h2>
                   <div className="flex items-center space-x-4">
@@ -533,7 +554,7 @@ const Dashboard = ({ studentData, onLogout }) => {
           </div>
         </motion.div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-6 sm:mb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className={`rounded-2xl p-4 border ${dark ? "bg-white/[0.04] border-white/10" : "bg-white/70 border-white/30"}`}>
             <p className={`text-xs font-medium uppercase ${dark ? "text-gray-400" : "text-gray-500"}`}>CGPA</p>
             <p className="text-2xl font-bold text-emerald-500">{dashboardStats.cgpa ?? "N/A"}</p>
@@ -552,7 +573,7 @@ const Dashboard = ({ studentData, onLogout }) => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
