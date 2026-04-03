@@ -26,10 +26,29 @@ const Dashboard = ({ studentData, onLogout }) => {
   });
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const socketRef = useRef(null);
+  const notificationRef = useRef(null);
+  const messagesRef = useRef(null);
   const [dark, setDark] = useState(() => {
     try { return JSON.parse(localStorage.getItem('student-dark-mode')) ?? true; } catch { return true; }
   });
   useEffect(() => { localStorage.setItem('student-dark-mode', JSON.stringify(dark)); }, [dark]);
+
+  // Handle click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotification(false);
+      }
+      if (messagesRef.current && !messagesRef.current.contains(event.target)) {
+        setShowMessages(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Notification type icon & color map
   const notifMeta = {
@@ -191,7 +210,7 @@ const Dashboard = ({ studentData, onLogout }) => {
               </h1>
             </div>
             <div className="flex items-center space-x-3">
-              <div className="relative">
+              <div className="relative" ref={messagesRef}>
                 <button
                   onClick={() => {
                     setShowMessages(!showMessages);
@@ -213,96 +232,6 @@ const Dashboard = ({ studentData, onLogout }) => {
                     </span>
                   )}
                 </button>
-                <button
-                  onClick={() => {
-                    setShowNotification(!showNotification);
-                    setShowMessages(false);
-                  }}
-                  className="relative bg-white/10 backdrop-blur-md hover:bg-white/20 p-3 rounded-xl transition-all duration-300 group border border-white/20"
-                >
-                  <svg
-                    className="w-5 h-5 text-white group-hover:scale-110 transition-transform"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                  </svg>
-                  {unreadNotifCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
-                      {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
-                    </span>
-                  )}
-                </button>
-                {showNotification && (
-                  <div className="absolute right-0 mt-3 w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-[28rem] overflow-hidden animate-slideUp">
-                    <div className="p-4 border-b border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-gray-800 text-lg">Notifications</h3>
-                        <div className="flex items-center space-x-2">
-                          {unreadNotifCount > 0 && (
-                            <button
-                              onClick={markAllNotificationsRead}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
-                            >
-                              Mark all read
-                            </button>
-                          )}
-                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                            {unreadNotifCount} new
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="max-h-80 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500">
-                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                            </svg>
-                          </div>
-                          <p className="font-medium">No notifications yet</p>
-                          <p className="text-sm text-gray-400 mt-1">You'll be notified about feedback, messages & more</p>
-                        </div>
-                      ) : (
-                        notifications.map((notif) => {
-                          const meta = notifMeta[notif.type] || notifMeta.system;
-                          return (
-                            <div
-                              key={notif._id}
-                              className={`p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-all duration-200 ${
-                                !notif.isRead ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500" : ""
-                              }`}
-                              onClick={() => {
-                                if (!notif.isRead) markNotificationRead(notif._id);
-                              }}
-                            >
-                              <div className="flex items-start space-x-3">
-                                <div className={`w-10 h-10 bg-gradient-to-br ${meta.color} rounded-full flex items-center justify-center text-white text-lg shadow-md flex-shrink-0`}>
-                                  {meta.icon}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{meta.label}</span>
-                                    <span className="text-xs text-gray-400">{timeAgo(notif.createdAt)}</span>
-                                  </div>
-                                  <p className="font-semibold text-gray-800 text-sm truncate">{notif.title}</p>
-                                  <p className="text-sm text-gray-600 line-clamp-2 mt-0.5">{notif.body}</p>
-                                  {notif.senderName && (
-                                    <p className="text-xs text-gray-400 mt-1">From: {notif.senderName}</p>
-                                  )}
-                                </div>
-                                {!notif.isRead && (
-                                  <span className="inline-block w-2.5 h-2.5 bg-blue-500 rounded-full mt-1 animate-pulse flex-shrink-0"></span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
                 {showMessages && (
                   <div className="absolute right-0 mt-3 w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-96 overflow-hidden animate-slideUp">
                     <div className="p-6 border-b border-gray-100">
@@ -404,6 +333,98 @@ const Dashboard = ({ studentData, onLogout }) => {
                             </p>
                           </div>
                         ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="relative" ref={notificationRef}>
+                <button
+                  onClick={() => {
+                    setShowNotification(!showNotification);
+                    setShowMessages(false);
+                  }}
+                  className="relative bg-white/10 backdrop-blur-md hover:bg-white/20 p-3 rounded-xl transition-all duration-300 group border border-white/20"
+                >
+                  <svg
+                    className="w-5 h-5 text-white group-hover:scale-110 transition-transform"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                  </svg>
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
+                      {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                    </span>
+                  )}
+                </button>
+                {showNotification && (
+                  <div className="absolute right-0 mt-3 w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-[28rem] overflow-hidden animate-slideUp">
+                    <div className="p-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-gray-800 text-lg">Notifications</h3>
+                        <div className="flex items-center space-x-2">
+                          {unreadNotifCount > 0 && (
+                            <button
+                              onClick={markAllNotificationsRead}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                            >
+                              Mark all read
+                            </button>
+                          )}
+                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                            {unreadNotifCount} new
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500">
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                            </svg>
+                          </div>
+                          <p className="font-medium">No notifications yet</p>
+                          <p className="text-sm text-gray-400 mt-1">You'll be notified about feedback, messages & more</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => {
+                          const meta = notifMeta[notif.type] || notifMeta.system;
+                          return (
+                            <div
+                              key={notif._id}
+                              className={`p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-all duration-200 ${
+                                !notif.isRead ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500" : ""
+                              }`}
+                              onClick={() => {
+                                if (!notif.isRead) markNotificationRead(notif._id);
+                              }}
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className={`w-10 h-10 bg-gradient-to-br ${meta.color} rounded-full flex items-center justify-center text-white text-lg shadow-md flex-shrink-0`}>
+                                  {meta.icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{meta.label}</span>
+                                    <span className="text-xs text-gray-400">{timeAgo(notif.createdAt)}</span>
+                                  </div>
+                                  <p className="font-semibold text-gray-800 text-sm truncate">{notif.title}</p>
+                                  <p className="text-sm text-gray-600 line-clamp-2 mt-0.5">{notif.body}</p>
+                                  {notif.senderName && (
+                                    <p className="text-xs text-gray-400 mt-1">From: {notif.senderName}</p>
+                                  )}
+                                </div>
+                                {!notif.isRead && (
+                                  <span className="inline-block w-2.5 h-2.5 bg-blue-500 rounded-full mt-1 animate-pulse flex-shrink-0"></span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </div>

@@ -315,6 +315,12 @@ const LandingPage = () => {
                 >
                   Teacher Login
                 </button>
+                  <button
+                  onClick={() => navigate("/admin/login")}
+                  className="w-full sm:w-auto btn-ripple hero-login-btn text-white px-7 py-3.5 rounded-2xl text-base font-semibold"
+                >
+                  Admin Login
+                </button>
               </motion.div>
             </div>
 
@@ -563,7 +569,7 @@ const LandingPage = () => {
                 Smart Student Hub
               </h3>
               <p className="text-gray-400 text-xs md:text-sm">
-                Smart India Hackathon 2025 - Problem Statement #25093
+                Smart Student Hub @ All rights reserved. Designed and developed by the Error Squad x Team.
               </p>
             </div>
             <div className="flex flex-wrap gap-4 md:gap-6">
