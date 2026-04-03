@@ -27,6 +27,11 @@ import StudentDetails from "./components/StudentDetails";
 import Leaderboard from "./components/Leaderboard";
 import SystemFeaturesPage from "./components/SystemFeaturesPage";
 import ContactPage from "./components/ContactPage";
+import PrivacyPolicy from "./components/PrivacyPolicy";
+import TermsOfService from "./components/TermsOfService";
+import ContactPageLight from "./components/ContactPageLight";
+import PrivacyPolicyLight from "./components/PrivacyPolicyLight";
+import TermsOfServiceLight from "./components/TermsOfServiceLight";
 import api from "./services/api";
 
 // Page transition wrapper
@@ -66,6 +71,26 @@ const AnimatedRoutes = ({ studentData, teacherData, adminData, handleLogin, hand
         <Route
           path="/contact"
           element={<PageTransition><ContactPage /></PageTransition>}
+        />
+        <Route
+          path="/privacy"
+          element={<PageTransition><PrivacyPolicy /></PageTransition>}
+        />
+        <Route
+          path="/terms"
+          element={<PageTransition><TermsOfService /></PageTransition>}
+        />
+        <Route
+          path="/privacy-light"
+          element={<PageTransition><PrivacyPolicyLight /></PageTransition>}
+        />
+        <Route
+          path="/terms-light"
+          element={<PageTransition><TermsOfServiceLight /></PageTransition>}
+        />
+        <Route
+          path="/contact-light"
+          element={<PageTransition><ContactPageLight /></PageTransition>}
         />
         <Route
           path="/login"

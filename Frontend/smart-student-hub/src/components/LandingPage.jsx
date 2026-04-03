@@ -161,8 +161,8 @@ const LandingPage = () => {
                 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-slate-900 mb-7 leading-[1.05] tracking-tight"
                 style={{ fontFamily: "Poppins, Inter, system-ui, -apple-system, sans-serif" }}
               >
-                Centralized Digital Platform for
-                <span className="block mt-2 hero-highlight-text">Smart Student Hub</span>
+                AI Powered Academic & Career Growth Platform
+                {/* <span className="block mt-2 hero-highlight-text">Smart Student Hub</span> */}
               </motion.h1>
 
               <motion.p
@@ -577,18 +577,21 @@ const LandingPage = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-4 md:gap-6">
-              {["Privacy Policy", "Terms of Service"].map((link) => (
-                <a
-                  key={link}
-                  href="#"
-                  className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm"
-                >
-                  {link}
-                </a>
-              ))}
+              <button
+                onClick={() => navigate("/privacy")}
+                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm cursor-pointer"
+              >
+                Privacy Policy
+              </button>
+              <button
+                onClick={() => navigate("/terms")}
+                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm cursor-pointer"
+              >
+                Terms of Service
+              </button>
               <button
                 onClick={() => navigate("/contact")}
-                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm"
+                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm cursor-pointer"
               >
                 Contact
               </button>
