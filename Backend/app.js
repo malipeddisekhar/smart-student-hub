@@ -116,7 +116,9 @@ const io = new Server(server, {
   cors: {
     origin: [
       'http://localhost:5173',
-      'https://sih-smart-student-hub-2.onrender.com'
+      'https://sih-smart-student-hub-2.onrender.com',
+      'https://smart-student-hub.me',
+      'https://www.smart-student-hub.me'
     ],
     methods: ['GET', 'POST'],
     credentials: true
@@ -192,7 +194,9 @@ connectDB().then(() => {
 app.use(cors({
   origin: [
     'http://localhost:5173',                     // local dev
-    'https://sih-smart-student-hub-2.onrender.com' // your deployed frontend
+    'https://sih-smart-student-hub-2.onrender.com', // old Render deployment
+    'https://smart-student-hub.me',             // your custom domain
+    'https://www.smart-student-hub.me'          // www variant
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
