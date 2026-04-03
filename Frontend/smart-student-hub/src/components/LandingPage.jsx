@@ -161,8 +161,8 @@ const LandingPage = () => {
                 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-slate-900 mb-7 leading-[1.05] tracking-tight"
                 style={{ fontFamily: "Poppins, Inter, system-ui, -apple-system, sans-serif" }}
               >
-                Centralized Digital Platform for
-                <span className="block mt-2 hero-highlight-text">Smart Student Hub</span>
+                AI Powered Academic & Career Growth Platform
+                {/* <span className="block mt-2 hero-highlight-text">Smart Student Hub</span> */}
               </motion.h1>
 
               <motion.p
