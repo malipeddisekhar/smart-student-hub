@@ -104,7 +104,7 @@ const Leaderboard = ({ studentData }) => {
       {/* Navbar */}
       {studentData && (
         <nav className={`shadow-2xl border-b transition-colors duration-500 ${dark ? "bg-slate-900/90 backdrop-blur-xl border-white/5 text-white" : "bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white border-white/10"}`}>
-          <div className="container mx-auto px-6 py-4">
+          <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4">
             <div className="flex justify-between items-center">
               <div className="flex items-center space-x-4">
                 <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg">
@@ -116,11 +116,11 @@ const Leaderboard = ({ studentData }) => {
                     <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
                   </svg>
                 </div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-white via-blue-100 to-indigo-200 bg-clip-text text-transparent">
+                <h1 className="hidden sm:block text-xl md:text-2xl font-bold bg-gradient-to-r from-white via-blue-100 to-indigo-200 bg-clip-text text-transparent">
                   Smart Student Hub
                 </h1>
               </div>
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 sm:space-x-4">
                 {/* Dark Mode Toggle */}
                 <button
                   onClick={() => setDark(!dark)}
@@ -137,13 +137,13 @@ const Leaderboard = ({ studentData }) => {
                 </button>
                 <button
                   onClick={() => navigate("/dashboard")}
-                  className="bg-white/10 backdrop-blur-md hover:bg-white/20 px-6 py-2 rounded-xl transition-all duration-300 border border-white/20 text-white font-medium"
+                  className="bg-white/10 backdrop-blur-md hover:bg-white/20 px-3 sm:px-6 py-2 rounded-xl transition-all duration-300 border border-white/20 text-white font-medium text-sm"
                 >
                   Dashboard
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 px-6 py-2 rounded-xl font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
+                  className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 px-3 sm:px-6 py-2 rounded-xl text-sm font-medium transition-all duration-300 transform hover:scale-105 shadow-lg"
                 >
                   Logout
                 </button>
@@ -154,11 +154,11 @@ const Leaderboard = ({ studentData }) => {
       )}
 
       {/* Main Content */}
-      <div className="container mx-auto px-6 py-12">
-        <div className={`backdrop-blur-2xl rounded-3xl shadow-2xl p-8 border mb-8 transition-colors duration-500 ${dark ? "bg-slate-800/70 border-slate-700/50" : "bg-white/70 border-white/30"}`}>
-          <div className="flex items-center justify-between mb-8">
+      <div className="container mx-auto px-3 sm:px-6 py-6 sm:py-12">
+        <div className={`backdrop-blur-2xl rounded-2xl sm:rounded-3xl shadow-2xl p-4 sm:p-8 border mb-6 sm:mb-8 transition-colors duration-500 ${dark ? "bg-slate-800/70 border-slate-700/50" : "bg-white/70 border-white/30"}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
             <div>
-              <h1 className={`text-5xl font-bold bg-clip-text text-transparent mb-2 ${dark ? "bg-gradient-to-r from-white via-blue-200 to-indigo-300" : "bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800"}`}>
+              <h1 className={`text-2xl sm:text-3xl md:text-5xl font-bold bg-clip-text text-transparent mb-2 ${dark ? "bg-gradient-to-r from-white via-blue-200 to-indigo-300" : "bg-gradient-to-r from-slate-800 via-blue-800 to-indigo-800"}`}>
                 {activeMeta.title}
               </h1>
               <p className={`text-lg ${dark ? "text-gray-400" : "text-gray-600"}`}>
@@ -184,7 +184,7 @@ const Leaderboard = ({ studentData }) => {
               </div>
             )}
             {studentData && (
-            <div className={`w-24 h-24 bg-gradient-to-br ${
+            <div className={`hidden sm:block w-24 h-24 bg-gradient-to-br ${
               platform === "leetcode" 
                 ? "from-orange-500 to-red-600" 
                 : "from-amber-500 to-yellow-600"
@@ -208,10 +208,10 @@ const Leaderboard = ({ studentData }) => {
 
           {/* Platform Toggle */}
           <div className="mb-6">
-            <div className={`flex items-center gap-4 p-2 rounded-2xl w-fit transition-colors duration-500 ${dark ? "bg-slate-700/60" : "bg-gradient-to-r from-slate-100 to-blue-100"}`}>
+            <div className={`flex flex-wrap items-center gap-2 sm:gap-4 p-2 rounded-2xl transition-colors duration-500 ${dark ? "bg-slate-700/60" : "bg-gradient-to-r from-slate-100 to-blue-100"}`}>
               <button
                 onClick={() => setPlatform("leetcode")}
-                className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                className={`px-4 sm:px-6 py-2 sm:py-3 rounded-xl text-sm font-semibold transition-all duration-300 ${
                   platform === "leetcode"
                     ? "bg-gradient-to-r from-orange-500 to-red-600 text-white shadow-lg scale-105"
                     : dark ? "bg-transparent text-gray-400 hover:bg-slate-600/50" : "bg-transparent text-gray-600 hover:bg-white/50"
@@ -221,7 +221,7 @@ const Leaderboard = ({ studentData }) => {
               </button>
               <button
                 onClick={() => setPlatform("codechef")}
-                className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                className={`px-4 sm:px-6 py-2 sm:py-3 rounded-xl text-sm font-semibold transition-all duration-300 ${
                   platform === "codechef"
                     ? "bg-gradient-to-r from-amber-500 to-yellow-600 text-white shadow-lg scale-105"
                     : dark ? "bg-transparent text-gray-400 hover:bg-slate-600/50" : "bg-transparent text-gray-600 hover:bg-white/50"
@@ -232,7 +232,7 @@ const Leaderboard = ({ studentData }) => {
               <button
                 onClick={() => fetchLeaderboard(true)}
                 disabled={refreshing}
-                className={`px-4 py-3 rounded-xl font-semibold transition-all duration-300 border ${dark ? "border-white/15 text-gray-200 hover:bg-white/10" : "border-slate-200 text-slate-700 hover:bg-white"} disabled:opacity-60`}
+                className={`px-3 sm:px-4 py-2 sm:py-3 rounded-xl text-sm font-semibold transition-all duration-300 border ${dark ? "border-white/15 text-gray-200 hover:bg-white/10" : "border-slate-200 text-slate-700 hover:bg-white"} disabled:opacity-60`}
                 title="Refresh leaderboard"
               >
                 {refreshing ? "Refreshing..." : "Refresh"}
@@ -377,13 +377,13 @@ const Leaderboard = ({ studentData }) => {
               <table className="w-full">
                 <thead>
                   <tr className={`text-white ${dark ? "bg-gradient-to-r from-slate-800 via-indigo-900 to-slate-800" : "bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900"}`}>
-                    <th className="px-6 py-4 text-left font-bold">Rank</th>
-                    <th className="px-6 py-4 text-left font-bold">Student Name</th>
-                    <th className="px-6 py-4 text-left font-bold">College</th>
-                    <th className="px-6 py-4 text-center font-bold">
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left font-bold text-sm">Rank</th>
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-left font-bold text-sm">Student Name</th>
+                    <th className="hidden md:table-cell px-6 py-4 text-left font-bold text-sm">College</th>
+                    <th className="hidden sm:table-cell px-6 py-4 text-center font-bold text-sm">
                       {activeMeta.usernameLabel}
                     </th>
-                    <th className="px-6 py-4 text-center font-bold">
+                    <th className="px-3 sm:px-6 py-3 sm:py-4 text-center font-bold text-sm">
                       Problems Solved
                     </th>
                   </tr>
@@ -408,7 +408,7 @@ const Leaderboard = ({ studentData }) => {
                                 : `hover:bg-gray-50 border-gray-100 ${index % 2 === 0 ? "bg-gray-50/30" : ""}`
                           }`}
                         >
-                          <td className="px-6 py-4">
+                          <td className="px-3 sm:px-6 py-3 sm:py-4">
                             <div className="flex items-center space-x-3">
                               {student.rank <= 3 && (
                                 <div
@@ -432,7 +432,7 @@ const Leaderboard = ({ studentData }) => {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-3 sm:px-6 py-3 sm:py-4">
                             <span
                               className={`font-semibold ${
                                 isCurrentUser
@@ -448,10 +448,10 @@ const Leaderboard = ({ studentData }) => {
                               )}
                             </span>
                           </td>
-                          <td className={`px-6 py-4 ${dark ? "text-gray-400" : "text-gray-600"}`}>
+                          <td className={`hidden md:table-cell px-6 py-4 ${dark ? "text-gray-400" : "text-gray-600"}`}>
                             {student.college}
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="hidden sm:table-cell px-6 py-4 text-center">
                             {platform === "leetcode" ? (
                               getUsername(student) ? (
                                 <a
@@ -480,7 +480,7 @@ const Leaderboard = ({ studentData }) => {
                               )
                             )}
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-3 sm:px-6 py-3 sm:py-4 text-center">
                             <div className="flex items-center justify-center space-x-2">
                               {getScore(student) > 0 ? (
                                 <>
@@ -539,7 +539,7 @@ const Leaderboard = ({ studentData }) => {
 
             {/* Leaderboard Stats */}
             {leaderboard.length > 0 && (
-              <div className={`grid grid-cols-3 gap-4 p-6 border-t transition-colors duration-500 ${dark ? "bg-slate-800/50 border-slate-700/40" : "bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50 border-gray-100"}`}>
+              <div className={`grid grid-cols-3 gap-2 sm:gap-4 p-4 sm:p-6 border-t transition-colors duration-500 ${dark ? "bg-slate-800/50 border-slate-700/40" : "bg-gradient-to-r from-slate-50 via-blue-50 to-indigo-50 border-gray-100"}`}>
                 <div className="text-center">
                   <p className={`text-sm font-medium ${dark ? "text-gray-500" : "text-gray-600"}`}>
                     Total Students
