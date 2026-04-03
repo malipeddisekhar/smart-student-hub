@@ -587,11 +587,11 @@ const Dashboard = ({ studentData, onLogout }) => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
             className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
-            onClick={() => navigate("/academic-certificates")}
+            onClick={() => navigate("/resume-analyzer")}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <div className="relative z-10">
-              <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+              <div className="w-16 h-16 bg-gradient-to-br from-rose-600 to-pink-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
                 <svg
                   className="w-8 h-8 text-white"
                   fill="none"
@@ -602,54 +602,18 @@ const Dashboard = ({ studentData, onLogout }) => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 713.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 713.138-3.138z"
+                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
                   />
                 </svg>
               </div>
-              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-green-400" : "text-gray-800 group-hover:text-green-700"}`}>
-                Academic Certificates
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-rose-400" : "text-gray-800 group-hover:text-rose-700"}`}>
+                AI Resume Analyzer
               </h3>
               <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
-                Manage and showcase your academic achievements
+                AI-powered resume analysis with real internship recommendations from top platforms
               </p>
-              <div className="mt-4 flex items-center text-green-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
-                <span className="text-sm">Manage →</span>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
-            onClick={() => navigate("/personal-achievements")}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="relative z-10">
-              <div className="w-16 h-16 bg-gradient-to-br from-yellow-600 to-orange-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <svg
-                  className="w-8 h-8 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 713.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 713.138-3.138z"
-                  />
-                </svg>
-              </div>
-              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-orange-400" : "text-gray-800 group-hover:text-orange-700"}`}>
-                Personal Achievements
-              </h3>
-              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
-                Track your personal certificates and accomplishments
-              </p>
-              <div className="mt-4 flex items-center text-orange-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
-                <span className="text-sm">View →</span>
+              <div className="mt-4 flex items-center text-rose-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
+                <span className="text-sm">Analyze →</span>
               </div>
             </div>
           </motion.div>
@@ -803,11 +767,11 @@ const Dashboard = ({ studentData, onLogout }) => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.8 }}
             className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
-            onClick={() => navigate("/resume-analyzer")}
+            onClick={() => navigate("/academic-certificates")}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <div className="relative z-10">
-              <div className="w-16 h-16 bg-gradient-to-br from-rose-600 to-pink-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
                 <svg
                   className="w-8 h-8 text-white"
                   fill="none"
@@ -818,18 +782,18 @@ const Dashboard = ({ studentData, onLogout }) => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 713.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 713.138-3.138z"
                   />
                 </svg>
               </div>
-              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-rose-400" : "text-gray-800 group-hover:text-rose-700"}`}>
-                AI Resume Analyzer
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-green-400" : "text-gray-800 group-hover:text-green-700"}`}>
+                Academic Certificates
               </h3>
               <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
-                AI-powered resume analysis with real internship recommendations from top platforms
+                Manage and showcase your academic achievements
               </p>
-              <div className="mt-4 flex items-center text-rose-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
-                <span className="text-sm">Analyze →</span>
+              <div className="mt-4 flex items-center text-green-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
+                <span className="text-sm">Manage →</span>
               </div>
             </div>
           </motion.div>

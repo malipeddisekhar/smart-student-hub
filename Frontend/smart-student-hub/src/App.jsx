@@ -11,7 +11,6 @@ import LandingPage from "./components/LandingPage";
 import StudentLogin from "./components/StudentLogin";
 import StudentRegister from "./components/StudentRegister";
 import Dashboard from "./components/Dashboard";
-import PersonalAchievements from "./components/PersonalAchievements";
 import StudentProfile from "./components/StudentProfile";
 import ViewProfile from "./components/ViewProfile";
 import Projects from "./components/Projects";
@@ -99,16 +98,6 @@ const AnimatedRoutes = ({ studentData, teacherData, adminData, handleLogin, hand
               <PageTransition><Dashboard studentData={studentData} onLogout={handleLogout} /></PageTransition>
             ) : (
               <Navigate to="/" />
-            )
-          }
-        />
-        <Route
-          path="/personal-achievements"
-          element={
-            studentData ? (
-              <PageTransition><PersonalAchievements studentData={studentData} /></PageTransition>
-            ) : (
-              <Navigate to="/login" />
             )
           }
         />
