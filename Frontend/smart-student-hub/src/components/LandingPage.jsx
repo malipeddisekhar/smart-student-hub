@@ -577,18 +577,21 @@ const LandingPage = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-4 md:gap-6">
-              {["Privacy Policy", "Terms of Service"].map((link) => (
-                <a
-                  key={link}
-                  href="#"
-                  className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm"
-                >
-                  {link}
-                </a>
-              ))}
+              <button
+                onClick={() => navigate("/privacy")}
+                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm cursor-pointer"
+              >
+                Privacy Policy
+              </button>
+              <button
+                onClick={() => navigate("/terms")}
+                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm cursor-pointer"
+              >
+                Terms of Service
+              </button>
               <button
                 onClick={() => navigate("/contact")}
-                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm"
+                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm cursor-pointer"
               >
                 Contact
               </button>
