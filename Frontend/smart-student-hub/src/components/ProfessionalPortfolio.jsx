@@ -1051,29 +1051,15 @@ const ProfessionalPortfolio = ({ studentData }) => {
                   <span>Generate PDF Portfolio</span>
                 </button>
 
-                <div className="flex flex-col space-y-3">
-                  <div className="flex items-center space-x-2 px-2">
-                    <label className="text-gray-700 font-medium text-sm">Web Template:</label>
-                    <select 
-                      value={selectedWebTemplate} 
-                      onChange={(e) => setSelectedWebTemplate(e.target.value)}
-                      className="bg-white border border-gray-300 text-gray-700 rounded-lg focus:ring-green-500 focus:border-green-500 block w-full p-2 text-sm"
-                    >
-                      {webTemplates.map(t => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <button
-                    onClick={generateWebPortfolio}
-                    className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white p-6 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-3 w-full"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
-                    </svg>
-                    <span>Generate Web Portfolio</span>
-                  </button>
-                </div>
+                <button
+                  onClick={generateWebPortfolio}
+                  className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white p-6 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-3 w-full sm:w-auto"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+                  </svg>
+                  <span>Generate Web Portfolio</span>
+                </button>
               </div>
             </div>
           </div>
@@ -1118,18 +1104,7 @@ const ProfessionalPortfolio = ({ studentData }) => {
               </div>
 
               <div className="text-center max-w-md mx-auto">
-                <div className="mb-6 flex flex-col items-start text-left bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
-                  <label className="text-gray-700 font-bold mb-2">Select Resume Template</label>
-                  <select 
-                    value={selectedResumeTemplate} 
-                    onChange={(e) => setSelectedResumeTemplate(e.target.value)}
-                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-red-500 focus:border-red-500 block w-full p-2.5"
-                  >
-                    {resumeTemplatesList.map(t => (
-                      <option key={t.id} value={t.id}>{t.name}</option>
-                    ))}
-                  </select>
-                </div>
+
                 <button
                   onClick={generateResume}
                   className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white p-6 rounded-xl font-medium transition-all duration-200 transform hover:scale-105 shadow-lg flex items-center justify-center space-x-3 w-full"
