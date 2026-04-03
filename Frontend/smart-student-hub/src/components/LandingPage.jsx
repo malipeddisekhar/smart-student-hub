@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../services/api";
+import HowItWorks from "./HowItWorks";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -358,6 +359,9 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+
+      {/* How It Works Section */}
+      <HowItWorks />
 
       {/* Feature Blocks */}
       <section className="py-20 relative">
