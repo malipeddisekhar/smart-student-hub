@@ -1,293 +1,89 @@
-# Smart Student Hub (Mini Project)
-
-Smart Student Hub is a full-stack mini project for Higher Education Institutions (HEIs). It provides a centralized platform to manage student activity records, academic proofs, coding profile growth, and communication between students, teachers, and admins.
-
-This project combines a web application, backend API, and a React Native mobile app to digitize records that are usually scattered across departments or paperwork.
-
-## Live Project Links
-
-The project also has a live deployment setup for quick evaluation and demo use.
-
-- Live Application: `https://sih-smart-student-hub-2.onrender.com`
-- Live API Health Check: `https://sih-smart-student-hub-2.onrender.com/api/test`
-
-### How to test the live project
-1. Open the live application link.
-2. Use Student/Teacher/Admin login modules from the UI.
-3. Verify major flows: profile, certificates, projects, and role-based dashboards.
-4. Test coding integrations from student workflow (LeetCode/CodeChef username linking).
-5. Validate backend availability through the API test endpoint.
-
-### Demo-ready feature checklist on live link
-- Role-based authentication for Student/Teacher/Admin
-- Academic certificate submission and review flow
-- Personal certificates and project portfolio handling
-- Coding profile integrations and leaderboard support
-- Messaging/notification-enabled platform behavior
-
-## Mini Project Context
-
-This repository is built as a mini project focused on solving the problem of fragmented student achievement data.
-
-### Core objective
-- Create a single source of truth for student academic and co-curricular data.
-- Enable role-based workflows for Students, Teachers, and Admins.
-- Support verification and review of certificates.
-- Generate profile/portfolio-ready student data.
-
-### Why this project matters
-- Reduces manual tracking effort.
-- Improves transparency in review and approval.
-- Helps institutes prepare data for audits, accreditation, and reporting.
-- Encourages students to maintain updated digital portfolios.
-
-## Solution Overview
-
-The project has three main parts:
-
-1. Backend (Node.js + Express + MongoDB)
-2. Frontend Web App (React + Vite + Tailwind)
-3. Mobile App (React Native + Expo)
-
-### High-level architecture
-- The web and mobile clients call REST APIs from the backend.
-- Backend manages authentication, file uploads, business logic, and role-based flows.
-- MongoDB stores user records, certificates, projects, groups, messages, and notifications.
-- Cloudinary stores uploaded media.
-- Socket.IO supports real-time notifications/messaging updates.
-
-## Major Features
-
-### 1. Multi-role authentication and access
-- Student login/register
-- Teacher login/register
-- Admin login/register
-- Google OAuth token verification endpoint
-- Microsoft OAuth route integration (via auth routes)
-
-### 2. Student profile and portfolio management
-- Profile create/update with personal/academic details
-- Personal certificates upload and listing
-- Academic certificate submission for review workflow
-- Projects management for portfolio
-- Portfolio data endpoints for professional profile building
-
-### 3. Academic certificate review workflow
-- Teachers/Admins can review pending academic certificates
-- Approve/reject actions with status updates
-- Scan-based verification endpoints for certificate confidence checks
-- Teacher-specific certificate statistics
-
-### 4. Competitive coding integration
-- LeetCode username linking and stats sync
-- CodeChef username linking and stats sync
-- Dedicated refresh endpoints for latest coding metrics
-- Leaderboard endpoints (overall, LeetCode, CodeChef)
-
-### 5. AI-assisted functionality
-- Resume upload and text extraction
-- Resume profile analysis endpoint
-- AI chatbot endpoint for support/assistance
-
-### 6. Real-time communication layer
-- Socket.IO-based user room joining
-- Notification and unread count endpoints
-- Student message inbox and read-state tracking
-- Feedback sending endpoint with real-time updates
-
-### 7. Administration and institutional control
-- College and department listing
-- Group creation/assignment flows
-- Admin-level student/teacher management (view/edit/delete)
-- Teacher group and student mapping
-
-## Tech Stack
-
-### Backend
-- Node.js, Express.js
-- MongoDB + Mongoose
-- Socket.IO
-- Multer + Cloudinary
-- Passport (including Microsoft strategy)
-- Google auth library
-- bcrypt, jsonwebtoken
-- OCR/Parsing libs: tesseract.js, pdf-parse, jimp, jsqr
-
-### Frontend (Web)
-- React (Vite)
-- React Router
-- Tailwind CSS
-- Framer Motion
-- Axios
-- Three.js + React Three Fiber + Drei
-
-### Mobile App
-- React Native (Expo)
-- React Navigation
-- Axios
-- Expo Document/Image/File modules
-
-## Repository Structure
-
-```text
-sih-smart-student-hub/
-  Backend/                     # Express API, models, services, scripts
-    app.js
-    models/
-    routes/
-    utils/
-  Frontend/smart-student-hub/  # React web app
-    src/
-      components/
-      services/
-  SmartStudentHubMobile/       # React Native mobile app
-    src/
-      screens/
-      services/
-  *.md                         # Integration guides and technical docs
-```
-
-## Backend API Coverage (Highlights)
-
-The backend includes endpoints for:
-- Auth: student/teacher/admin + OAuth verification
-- Profile and student data
-- Academic and personal certificates
-- Certificate scanning and scan status
-- Teacher groups and marks
-- Admin user management
-- Portfolio and projects
-- Resume analysis and chatbot
-- Search
-- LeetCode and CodeChef sync + leaderboards
-- Messaging and notifications
-
-Quick examples:
-- `POST /api/register`
-- `POST /api/login`
-- `POST /api/academic-certificates`
-- `GET /api/review/academic-certificates`
-- `POST /api/leetcode/update-username`
-- `POST /api/codechef/update-username`
-- `GET /api/leaderboard`
-- `POST /api/messages/send`
-
-## Local Setup Guide
-
-### 1) Clone and install
-
-```bash
-# from repository root
-cd Backend
-npm install
-
-cd ../Frontend/smart-student-hub
-npm install
-
-cd ../../SmartStudentHubMobile
-npm install
-```
-
-### 2) Environment configuration
-
-Create a `.env` file in `Backend/` and configure values such as:
-- `PORT`
-- `MONGODB_URI`
-- `SESSION_SECRET`
-- `CLOUDINARY_CLOUD_NAME`
-- `CLOUDINARY_API_KEY`
-- `CLOUDINARY_API_SECRET`
-- `GOOGLE_CLIENT_ID`
-- Microsoft OAuth credentials used by auth config
-
-### 3) Run backend
-
-```bash
-cd Backend
-npm run dev
-```
-
-Backend default URL: `http://localhost:3000`
-
-### 4) Run web frontend
-
-```bash
-cd Frontend/smart-student-hub
-npm run dev
-```
-
-Frontend default URL: `http://localhost:5173`
-
-### 5) Run mobile app (Expo)
-
-```bash
-cd SmartStudentHubMobile
-npm run start
-```
-
-Use Expo Go or emulator to test mobile flows.
-
-## Workflow Summary by Role
-
-### Student
-- Register/login
-- Update profile
-- Upload certificates/projects
-- Track approval status
-- Connect LeetCode/CodeChef
-- View rank/leaderboard
-
-### Teacher
-- Register/login
-- Manage assigned groups/students
-- Review and act on academic certificates
-- Monitor student performance and stats
-
-### Admin
-- Register/login
-- Manage student and teacher records
-- Configure groups and institutional data
-- Access system-wide data and controls
-
-## Documentation Index (Important)
-
-Use these detailed docs for specific modules:
-- `QUICK_START.md`
-- `API_DOCUMENTATION.md`
-- `COMPONENT_ARCHITECTURE.md`
-- `LEETCODE_IMPLEMENTATION.md`
-- `CODECHEF_INTEGRATION.md`
-- `CERTIFICATE_SCAN_QUICK_START.md`
-- `CERTIFICATE_SCAN_IMPLEMENTATION_SUMMARY.md`
-- `MICROSOFT_OAUTH_*` docs set
-- `README_CERTIFICATE_SCAN.md`
-
-## Current Status and Scope
-
-This mini project already includes:
-- Full role-based data flow (Student, Teacher, Admin)
-- Web and mobile clients
-- Competitive coding integrations
-- Certificate scan + review pipeline
-- Real-time communication layer
-
-Possible next enhancements:
-- Automated test coverage expansion
-- CI/CD pipeline integration
-- Role-based authorization middleware hardening
-- Analytics dashboards and exportable reports
-- Production deployment with monitoring
-
-## License
-
-Specify your preferred license here (for example: MIT) before production/public release.
-
-## Maintainer
-
-- GitHub: [malipeddisekhar](https://github.com/malipeddisekhar)
-
-## Author Note
-
-This repository represents a detailed mini project implementation for centralized student activity record management. The architecture and modules are designed to be extensible for larger institutional deployments.
-
-Project profile and updates are maintained through GitHub by [malipeddisekhar](https://github.com/malipeddisekhar).
+📚 Academic & Career Enhancement Platform (AI-Powered)
+
+A comprehensive AI-driven platform designed to enhance academic workflows, automate verification processes, support student career growth, and streamline faculty–student interactions.
+The platform provides three types of login credentials: Student, Teacher, and Admin, each tailored with specialized tools and features.
+
+👨‍🎓 Student Portal
+1. Login
+
+Students can log in using the demo credentials provided for testing and evaluation.
+
+2. AI Resume Generation (Powered by Grok API)
+Generates a complete, professional, ATS-friendly resume.
+The generated resume is fully editable and customizable.
+Ensures industry-standard formatting and content quality.
+3. AI Portfolio Generation (Grok API)
+Automatically creates a personalized portfolio using AI.
+Offers multiple customizable design templates.
+Students can update content and choose from various themes.
+4. AI Resume Analyzer
+
+Students can upload:
+
+Their own resume, or
+The resume generated by this platform.
+Key Features
+ATS Score Analyzer – evaluates resume based on recruitment standards.
+Skill Gap Analysis – identifies missing technical and soft skills.
+Pro Tips – suggests improvements to increase selection chances.
+Internship Recommendations – AI-suggested internship opportunities.
+Course Recommendations – recommends relevant upskilling courses.
+5. Academic Certificate Validation
+
+This feature solves a major issue faced by faculty: students uploading fake certificates.
+
+How It Works
+Uses OCR technology to detect fake or modified certificates.
+Currently supports NPTEL certificates (due to credit transfer requirements).
+Uploaded certificates are automatically sent to assigned mentors for verification.
+Teachers are equipped with an AI-powered certificate scanner for validation.
+6. LeetCode Credentials Integration
+Students can enter their LeetCode ID.
+Displays their coding progress, contest rankings, and problem-solving stats.
+Helps showcase the overall coding performance of the college.
+7. CodeChef Credentials Integration
+Similar to LeetCode integration.
+Displays ratings, contest results, and progress analytics.
+8. Project Portfoliko
+A central repository where students can organize and showcase all their projects.
+Useful for placements, evaluation, and building a strong professional profile.
+9. Chatbot (AI Assistance)
+Provides AI-powered guidance for navigation, resume queries, certificates, portfolio building, and general support.
+👩‍🏫 Teacher Portal
+1. Login
+
+Teacher access is also provided through demo credentials for evaluation.
+
+2. Certificate Verification
+Teachers can verify certificates of only their assigned students.
+Includes an AI-powered authenticity checker using OCR technology.
+Enables real-time feedback, approval, or rejection notifications.
+3. Student Counselling (Online)
+Teachers can conduct sessions online.
+Allows sending group notifications and updates to students.
+4. Report Generation
+Automated report generation for student progress, submissions, certificate validation status, and portfolio performance.
+5. Student Portfolio Analysis
+
+Teachers can analyze student growth based on:
+
+Projects
+Internships
+Certifications
+Coding profiles (LeetCode, CodeChef)
+Skill development metrics
+
+This helps create a complete and accurate view of student performance.
+
+🛠️ Admin Portal
+
+Admins are responsible for platform-wide management and mapping.
+
+Admin Capabilities
+Mentor–Mentee Mapping: Assigning teachers to students.
+Account Management: Managing both student and teacher accounts.
+System Monitoring: Overseeing platform activities, workflows, and user operations.
+Ensuring smooth functioning of all portal modules.
+📌 Summary
+
+This platform provides a unified ecosystem that bridges academics, coding skills, portfolio building, certificate verification, and student–teacher interaction — all powered by AI. It streamlines processes, increases transparency, and supports students in building a strong academic and career foundation.
