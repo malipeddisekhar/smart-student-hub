@@ -511,10 +511,15 @@ We welcome contributions! Please follow these steps:
 5. Open a Pull Request
 
 ---
+📄 License
 
-## 📄 License
+This project is licensed under the MIT License.
+---
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+If you want next level polish, I can:
+- Add **GitHub badges (build, stars, tech stack)**
+- Create a **perfect recruiter-focused version**
+- Or design a **portfolio + LinkedIn project description** 👍
 
 ---
 
@@ -536,6 +541,6 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ### ⭐ If you find this project helpful, please give it a star! ⭐
 
-**Built with ❤️ for students, by students**
+**Built with, by students**
 
 </div>
