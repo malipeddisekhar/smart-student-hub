@@ -1,6 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { SingleColumnTemplate, TwoColumnTemplate, SplitTemplate, ModernCardTemplate } from './PreviewTemplates';
+
+const PREVIEW_TEMPLATES = [
+  { id: 'single', name: 'Single Column (ATS)', icon: '📄', desc: 'Clean, vertical, ATS-friendly' },
+  { id: 'twocol', name: 'Two Column', icon: '📊', desc: 'Sidebar + main content' },
+  { id: 'split', name: '30–70 Split', icon: '📐', desc: 'Profile left, details right' },
+  { id: 'card', name: 'Modern Card', icon: '🃏', desc: 'Card-based portfolio style' },
+];
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: '👤' },
@@ -25,6 +33,54 @@ const ResumePortfolioEditor = ({ studentData }) => {
   const [saved, setSaved] = useState(false);
   const [profileData, setProfileData] = useState(null);
   const [fullStudentData, setFullStudentData] = useState(null);
+  const [certificates, setCertificates] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState('single');
+  const [downloading, setDownloading] = useState(false);
+  const previewRef = useRef(null);
+
+  const downloadPdf = async () => {
+    if (!previewRef.current) return;
+    setDownloading(true);
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+      const element = previewRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pdfW = pdf.internal.pageSize.getWidth();
+      const pdfH = pdf.internal.pageSize.getHeight();
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+      const ratio = Math.min(pdfW / imgW, pdfH / imgH);
+      const w = imgW * ratio;
+      const h = imgH * ratio;
+      pdf.addImage(imgData, 'PNG', (pdfW - w) / 2, 0, w, h);
+      // If content is taller than one page, add pages
+      if (h > pdfH) {
+        let remainH = h - pdfH;
+        let page = 1;
+        while (remainH > 0) {
+          pdf.addPage();
+          pdf.addImage(imgData, 'PNG', (pdfW - w) / 2, -(pdfH * page), w, h);
+          remainH -= pdfH;
+          page++;
+        }
+      }
+      const safeName = (fullStudentData?.name || 'Student').replace(/[^a-z0-9-_. ]/gi, '_');
+      pdf.save(`${safeName}_Resume_${selectedTemplate}.pdf`);
+    } catch (err) {
+      console.error('PDF download error:', err);
+      alert('Error generating PDF. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   // Editor form state
   const [formData, setFormData] = useState({
@@ -63,6 +119,7 @@ const ResumePortfolioEditor = ({ studentData }) => {
 
       setProfileData(profileRes.data);
       setFullStudentData(studentRes.data || studentData);
+      setCertificates(certsRes.data || []);
 
       const portfolio = portfolioRes.data || {};
 
@@ -467,139 +524,75 @@ const ResumePortfolioEditor = ({ studentData }) => {
     const name = fullStudentData?.name || 'Student';
     const department = fullStudentData?.department || '';
     const college = fullStudentData?.college || '';
-    const year = fullStudentData?.year || '';
-    const semester = fullStudentData?.semester || '';
     const email = profileData?.collegeEmail || fullStudentData?.email || '';
     const phone = profileData?.mobileNumber || '';
     const linkedin = profileData?.linkedinProfile || '';
     const github = profileData?.githubProfile || '';
 
+    const templateData = {
+      name,
+      headline: formData.headline || `${department} Student`,
+      email, phone, linkedin, github,
+      aboutMe: formData.aboutMe || formData.objectiveSummary || '',
+      education: formData.education || [],
+      experience: formData.experience || [],
+      projects: formData.customProjects || [],
+      skills: formData.customSkills || [],
+      awards: formData.awards || [],
+      languages: formData.languages || [],
+      hobbies: formData.hobbies || [],
+    };
+
+    const TemplateComponent = {
+      single: SingleColumnTemplate,
+      twocol: TwoColumnTemplate,
+      split: SplitTemplate,
+      card: ModernCardTemplate,
+    }[selectedTemplate] || SingleColumnTemplate;
+
     return (
-      <div className="max-w-3xl mx-auto">
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-6 text-sm text-amber-700">
-          👁️ This is a preview of how your content will appear in the generated resume & portfolio. Click "Generate" in Professional Portfolio to download.
+      <div className="space-y-5">
+        {/* Template Switcher */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {PREVIEW_TEMPLATES.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setSelectedTemplate(t.id)}
+              className={`p-3 rounded-xl border-2 text-left transition-all ${
+                selectedTemplate === t.id
+                  ? 'border-indigo-500 bg-indigo-50 shadow-md'
+                  : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">{t.icon}</span>
+                <span className={`text-sm font-semibold ${selectedTemplate === t.id ? 'text-indigo-700' : 'text-gray-700'}`}>{t.name}</span>
+              </div>
+              <p className="text-xs text-gray-500">{t.desc}</p>
+            </button>
+          ))}
         </div>
 
-        {/* Preview card */}
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-lg overflow-hidden">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-indigo-700 to-purple-700 text-white p-8">
-            <h1 className="text-3xl font-bold">{name}</h1>
-            <p className="text-indigo-200 mt-1">{formData.headline || `${department} Student`}</p>
-            <div className="flex flex-wrap gap-4 mt-3 text-sm text-indigo-100">
-              {email && <span>✉️ {email}</span>}
-              {phone && <span>📞 {phone}</span>}
-              {linkedin && <span>💼 LinkedIn</span>}
-              {github && <span>🐙 GitHub</span>}
-            </div>
+        {/* Preview Viewport */}
+        <div className="bg-gray-100 border border-gray-300 rounded-2xl shadow-inner overflow-auto" style={{ minHeight: '50vh', maxHeight: '70vh' }}>
+          <div ref={previewRef}>
+            <TemplateComponent data={templateData} />
           </div>
+        </div>
 
-          <div className="p-8 space-y-6">
-            {/* Objective */}
-            {formData.objectiveSummary && (
-              <div>
-                <h2 className="text-lg font-bold text-gray-800 border-b-2 border-indigo-500 pb-1 mb-3">Objective</h2>
-                <p className="text-gray-600 text-sm leading-relaxed">{formData.objectiveSummary}</p>
-              </div>
-            )}
-
-            {/* About Me */}
-            {formData.aboutMe && (
-              <div>
-                <h2 className="text-lg font-bold text-gray-800 border-b-2 border-indigo-500 pb-1 mb-3">About Me</h2>
-                <p className="text-gray-600 text-sm leading-relaxed">{formData.aboutMe}</p>
-              </div>
-            )}
-
-            {/* Education */}
-            {formData.education.length > 0 && (
-              <div>
-                <h2 className="text-lg font-bold text-gray-800 border-b-2 border-indigo-500 pb-1 mb-3">Education</h2>
-                {formData.education.map((edu, i) => (
-                  <div key={i} className="mb-3">
-                    <p className="font-semibold text-gray-800">{edu.degree} {edu.field && `in ${edu.field}`}</p>
-                    <p className="text-sm text-gray-600">{edu.institution} {edu.startYear && edu.endYear ? `(${edu.startYear} – ${edu.endYear})` : ''}</p>
-                    {edu.gpa && <p className="text-sm text-gray-500">GPA: {edu.gpa}</p>}
-                    {edu.description && <p className="text-sm text-gray-500 mt-1">{edu.description}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Experience */}
-            {formData.experience.length > 0 && (
-              <div>
-                <h2 className="text-lg font-bold text-gray-800 border-b-2 border-indigo-500 pb-1 mb-3">Experience</h2>
-                {formData.experience.map((exp, i) => (
-                  <div key={i} className="mb-3">
-                    <p className="font-semibold text-gray-800">{exp.title} {exp.company && `at ${exp.company}`}</p>
-                    <p className="text-sm text-gray-500">{exp.location} {exp.startDate && `| ${exp.startDate} – ${exp.current ? 'Present' : exp.endDate}`}</p>
-                    {exp.description && <p className="text-sm text-gray-600 mt-1">{exp.description}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Projects */}
-            {formData.customProjects.length > 0 && (
-              <div>
-                <h2 className="text-lg font-bold text-gray-800 border-b-2 border-indigo-500 pb-1 mb-3">Projects</h2>
-                {formData.customProjects.map((proj, i) => (
-                  <div key={i} className="mb-3">
-                    <p className="font-semibold text-gray-800">{proj.title || 'Untitled'}</p>
-                    {proj.technologies && <p className="text-xs text-indigo-600">{proj.technologies}</p>}
-                    {proj.description && <p className="text-sm text-gray-600 mt-1">{proj.description}</p>}
-                    <div className="flex gap-3 mt-1 text-xs text-indigo-500">
-                      {proj.githubLink && <span>GitHub ↗</span>}
-                      {proj.deployLink && <span>Demo ↗</span>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Skills */}
-            {formData.customSkills.length > 0 && (
-              <div>
-                <h2 className="text-lg font-bold text-gray-800 border-b-2 border-indigo-500 pb-1 mb-3">Skills</h2>
-                <div className="flex flex-wrap gap-2">
-                  {formData.customSkills.map((s, i) => (
-                    <span key={i} className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm">{s}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Awards */}
-            {formData.awards.length > 0 && (
-              <div>
-                <h2 className="text-lg font-bold text-gray-800 border-b-2 border-indigo-500 pb-1 mb-3">Awards</h2>
-                {formData.awards.map((a, i) => (
-                  <div key={i} className="mb-2">
-                    <p className="font-semibold text-gray-800">{a.title}</p>
-                    <p className="text-sm text-gray-500">{a.issuer} {a.date && `| ${a.date}`}</p>
-                    {a.description && <p className="text-sm text-gray-600">{a.description}</p>}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Languages & Hobbies */}
-            <div className="grid grid-cols-2 gap-6">
-              {formData.languages.length > 0 && (
-                <div>
-                  <h2 className="text-lg font-bold text-gray-800 border-b-2 border-indigo-500 pb-1 mb-3">Languages</h2>
-                  <p className="text-sm text-gray-600">{formData.languages.join(', ')}</p>
-                </div>
-              )}
-              {formData.hobbies.length > 0 && (
-                <div>
-                  <h2 className="text-lg font-bold text-gray-800 border-b-2 border-indigo-500 pb-1 mb-3">Hobbies</h2>
-                  <p className="text-sm text-gray-600">{formData.hobbies.join(', ')}</p>
-                </div>
-              )}
-            </div>
-          </div>
+        {/* Download Button */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 pt-2">
+          <button
+            onClick={downloadPdf}
+            disabled={downloading}
+            className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-8 py-3 rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 disabled:hover:scale-100"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            {downloading ? 'Generating PDF...' : 'Download as PDF'}
+          </button>
+          <p className="text-xs text-gray-400">Exports the selected template with your data as a PDF file.</p>
         </div>
       </div>
     );
@@ -620,7 +613,7 @@ const ResumePortfolioEditor = ({ studentData }) => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       {/* Header */}
       <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white shadow-2xl">
-        <div className="container mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
           <div className="flex items-center space-x-4">
             <button onClick={() => navigate('/dashboard')}
               className="bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-all border border-white/20">
@@ -629,22 +622,22 @@ const ResumePortfolioEditor = ({ studentData }) => {
               </svg>
             </button>
             <div>
-              <h1 className="text-xl font-bold">Resume & Portfolio Editor</h1>
+              <h1 className="text-base sm:text-xl font-bold">Resume & Portfolio Editor</h1>
               <p className="text-blue-200 text-xs">Edit once, reflect everywhere</p>
             </div>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3 w-full sm:w-auto justify-end">
             {saved && (
               <span className="bg-green-500/20 text-green-300 px-3 py-1.5 rounded-full text-sm animate-pulse border border-green-500/30">
                 ✓ Saved
               </span>
             )}
             <button onClick={handleSave} disabled={saving}
-              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 px-6 py-2.5 rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 text-sm">
+              className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 px-3 sm:px-6 py-2 sm:py-2.5 rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg disabled:opacity-50 text-xs sm:text-sm">
               {saving ? 'Saving...' : 'Save All'}
             </button>
             <button onClick={() => navigate('/professional-portfolio')}
-              className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 px-5 py-2.5 rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg text-sm">
+              className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl font-semibold transition-all transform hover:scale-105 shadow-lg text-xs sm:text-sm">
               Generate ↗
             </button>
           </div>
@@ -653,11 +646,11 @@ const ResumePortfolioEditor = ({ studentData }) => {
 
       {/* Tabs */}
       <div className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-40">
-        <div className="container mx-auto px-6">
-          <div className="flex space-x-1 overflow-x-auto py-2 scrollbar-thin">
+        <div className="container mx-auto px-3 sm:px-6">
+          <div className="flex space-x-1 overflow-x-auto py-2 scrollbar-hide">
             {TABS.map(tab => (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+                className={`flex items-center space-x-1.5 sm:space-x-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-all ${
                   activeTab === tab.id
                     ? 'bg-indigo-600 text-white shadow-lg'
                     : 'text-gray-600 hover:bg-gray-100'
@@ -671,8 +664,8 @@ const ResumePortfolioEditor = ({ studentData }) => {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-6 py-8 max-w-4xl">
-        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-8 border border-white/30">
+      <div className="container mx-auto px-3 sm:px-6 py-4 sm:py-8 max-w-4xl">
+        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-4 sm:p-8 border border-white/30">
           {activeTab === 'overview' && renderOverview()}
           {activeTab === 'education' && renderEducation()}
           {activeTab === 'experience' && renderExperience()}

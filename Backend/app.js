@@ -1,9 +1,9 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 const express = require("express");
 const cors = require("cors");
 const bcrypt = require("bcrypt");
 const multer = require("multer");
-const path = require("path");
 const fs = require("fs");
 const session = require("express-session");
 const passport = require("passport");
@@ -116,7 +116,9 @@ const io = new Server(server, {
   cors: {
     origin: [
       'http://localhost:5173',
-      'https://sih-smart-student-hub-2.onrender.com'
+      'https://sih-smart-student-hub-2.onrender.com',
+      'https://smart-student-hub.me',
+      'https://www.smart-student-hub.me'
     ],
     methods: ['GET', 'POST'],
     credentials: true
@@ -166,16 +168,35 @@ const personalUpload = multer({ storage: personalStorage });
 
 
 // Connect to MongoDB
-connectDB();
-setTimeout(() => {
-  enforceAdminWhitelist();
-}, 2000);
+connectDB().then(() => {
+  console.log("DB connected, starting server...");
+
+  server.listen(port, () => {
+    console.log(`🚀 Server running at http://localhost:${port}`);
+    console.log('🔌 Socket.IO ready for real-time notifications');
+    // Run first auto-refresh 1 minute after server starts
+    setTimeout(autoRefreshAllStats, 60 * 1000);
+    // Then every 30 minutes
+    setInterval(autoRefreshAllStats, 30 * 60 * 1000);
+    console.log('🔄 Auto-refresh scheduled: every 30 minutes');
+  });
+
+  // Enforce admin whitelist after 2 seconds
+  setTimeout(() => {
+    enforceAdminWhitelist();
+  }, 2000);
+}).catch((err) => {
+  console.error("Failed to connect DB ❌", err);
+  process.exit(1);
+});
 
 // Middleware
 app.use(cors({
   origin: [
     'http://localhost:5173',                     // local dev
-    'https://sih-smart-student-hub-2.onrender.com' // your deployed frontend
+    'https://sih-smart-student-hub-2.onrender.com', // old Render deployment
+    'https://smart-student-hub.me',             // your custom domain
+    'https://www.smart-student-hub.me'          // www variant
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
@@ -2869,14 +2890,4 @@ app.post('/api/feedback/send', async (req, res) => {
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
-});
-
-server.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-  console.log('🔌 Socket.IO ready for real-time notifications');
-  // Run first auto-refresh 1 minute after server starts
-  setTimeout(autoRefreshAllStats, 60 * 1000);
-  // Then every 30 minutes
-  setInterval(autoRefreshAllStats, 30 * 60 * 1000);
-  console.log('🔄 Auto-refresh scheduled: every 30 minutes');
 });

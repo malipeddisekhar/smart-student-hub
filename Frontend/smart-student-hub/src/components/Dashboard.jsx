@@ -26,10 +26,29 @@ const Dashboard = ({ studentData, onLogout }) => {
   });
   const [lastSyncedAt, setLastSyncedAt] = useState(null);
   const socketRef = useRef(null);
+  const notificationRef = useRef(null);
+  const messagesRef = useRef(null);
   const [dark, setDark] = useState(() => {
     try { return JSON.parse(localStorage.getItem('student-dark-mode')) ?? true; } catch { return true; }
   });
   useEffect(() => { localStorage.setItem('student-dark-mode', JSON.stringify(dark)); }, [dark]);
+
+  // Handle click outside to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setShowNotification(false);
+      }
+      if (messagesRef.current && !messagesRef.current.contains(event.target)) {
+        setShowMessages(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Notification type icon & color map
   const notifMeta = {
@@ -191,7 +210,7 @@ const Dashboard = ({ studentData, onLogout }) => {
               </h1>
             </div>
             <div className="flex items-center space-x-3">
-              <div className="relative">
+              <div className="relative" ref={messagesRef}>
                 <button
                   onClick={() => {
                     setShowMessages(!showMessages);
@@ -213,96 +232,6 @@ const Dashboard = ({ studentData, onLogout }) => {
                     </span>
                   )}
                 </button>
-                <button
-                  onClick={() => {
-                    setShowNotification(!showNotification);
-                    setShowMessages(false);
-                  }}
-                  className="relative bg-white/10 backdrop-blur-md hover:bg-white/20 p-3 rounded-xl transition-all duration-300 group border border-white/20"
-                >
-                  <svg
-                    className="w-5 h-5 text-white group-hover:scale-110 transition-transform"
-                    fill="currentColor"
-                    viewBox="0 0 20 20"
-                  >
-                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                  </svg>
-                  {unreadNotifCount > 0 && (
-                    <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
-                      {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
-                    </span>
-                  )}
-                </button>
-                {showNotification && (
-                  <div className="absolute right-0 mt-3 w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-[28rem] overflow-hidden animate-slideUp">
-                    <div className="p-4 border-b border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-gray-800 text-lg">Notifications</h3>
-                        <div className="flex items-center space-x-2">
-                          {unreadNotifCount > 0 && (
-                            <button
-                              onClick={markAllNotificationsRead}
-                              className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
-                            >
-                              Mark all read
-                            </button>
-                          )}
-                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-                            {unreadNotifCount} new
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="max-h-80 overflow-y-auto">
-                      {notifications.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500">
-                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
-                            </svg>
-                          </div>
-                          <p className="font-medium">No notifications yet</p>
-                          <p className="text-sm text-gray-400 mt-1">You'll be notified about feedback, messages & more</p>
-                        </div>
-                      ) : (
-                        notifications.map((notif) => {
-                          const meta = notifMeta[notif.type] || notifMeta.system;
-                          return (
-                            <div
-                              key={notif._id}
-                              className={`p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-all duration-200 ${
-                                !notif.isRead ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500" : ""
-                              }`}
-                              onClick={() => {
-                                if (!notif.isRead) markNotificationRead(notif._id);
-                              }}
-                            >
-                              <div className="flex items-start space-x-3">
-                                <div className={`w-10 h-10 bg-gradient-to-br ${meta.color} rounded-full flex items-center justify-center text-white text-lg shadow-md flex-shrink-0`}>
-                                  {meta.icon}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{meta.label}</span>
-                                    <span className="text-xs text-gray-400">{timeAgo(notif.createdAt)}</span>
-                                  </div>
-                                  <p className="font-semibold text-gray-800 text-sm truncate">{notif.title}</p>
-                                  <p className="text-sm text-gray-600 line-clamp-2 mt-0.5">{notif.body}</p>
-                                  {notif.senderName && (
-                                    <p className="text-xs text-gray-400 mt-1">From: {notif.senderName}</p>
-                                  )}
-                                </div>
-                                {!notif.isRead && (
-                                  <span className="inline-block w-2.5 h-2.5 bg-blue-500 rounded-full mt-1 animate-pulse flex-shrink-0"></span>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                )}
                 {showMessages && (
                   <div className="absolute right-0 mt-3 w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-96 overflow-hidden animate-slideUp">
                     <div className="p-6 border-b border-gray-100">
@@ -404,6 +333,98 @@ const Dashboard = ({ studentData, onLogout }) => {
                             </p>
                           </div>
                         ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="relative" ref={notificationRef}>
+                <button
+                  onClick={() => {
+                    setShowNotification(!showNotification);
+                    setShowMessages(false);
+                  }}
+                  className="relative bg-white/10 backdrop-blur-md hover:bg-white/20 p-3 rounded-xl transition-all duration-300 group border border-white/20"
+                >
+                  <svg
+                    className="w-5 h-5 text-white group-hover:scale-110 transition-transform"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                  </svg>
+                  {unreadNotifCount > 0 && (
+                    <span className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-xs rounded-full h-6 w-6 flex items-center justify-center font-bold shadow-lg animate-pulse">
+                      {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                    </span>
+                  )}
+                </button>
+                {showNotification && (
+                  <div className="absolute right-0 mt-3 w-96 bg-white/95 backdrop-blur-xl text-black rounded-2xl shadow-2xl border border-white/20 z-50 max-h-[28rem] overflow-hidden animate-slideUp">
+                    <div className="p-4 border-b border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-bold text-gray-800 text-lg">Notifications</h3>
+                        <div className="flex items-center space-x-2">
+                          {unreadNotifCount > 0 && (
+                            <button
+                              onClick={markAllNotificationsRead}
+                              className="text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                            >
+                              Mark all read
+                            </button>
+                          )}
+                          <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+                            {unreadNotifCount} new
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-gray-500">
+                          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z" />
+                            </svg>
+                          </div>
+                          <p className="font-medium">No notifications yet</p>
+                          <p className="text-sm text-gray-400 mt-1">You'll be notified about feedback, messages & more</p>
+                        </div>
+                      ) : (
+                        notifications.map((notif) => {
+                          const meta = notifMeta[notif.type] || notifMeta.system;
+                          return (
+                            <div
+                              key={notif._id}
+                              className={`p-4 border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-all duration-200 ${
+                                !notif.isRead ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500" : ""
+                              }`}
+                              onClick={() => {
+                                if (!notif.isRead) markNotificationRead(notif._id);
+                              }}
+                            >
+                              <div className="flex items-start space-x-3">
+                                <div className={`w-10 h-10 bg-gradient-to-br ${meta.color} rounded-full flex items-center justify-center text-white text-lg shadow-md flex-shrink-0`}>
+                                  {meta.icon}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">{meta.label}</span>
+                                    <span className="text-xs text-gray-400">{timeAgo(notif.createdAt)}</span>
+                                  </div>
+                                  <p className="font-semibold text-gray-800 text-sm truncate">{notif.title}</p>
+                                  <p className="text-sm text-gray-600 line-clamp-2 mt-0.5">{notif.body}</p>
+                                  {notif.senderName && (
+                                    <p className="text-xs text-gray-400 mt-1">From: {notif.senderName}</p>
+                                  )}
+                                </div>
+                                {!notif.isRead && (
+                                  <span className="inline-block w-2.5 h-2.5 bg-blue-500 rounded-full mt-1 animate-pulse flex-shrink-0"></span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -587,11 +608,11 @@ const Dashboard = ({ studentData, onLogout }) => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
             className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
-            onClick={() => navigate("/academic-certificates")}
+            onClick={() => navigate("/resume-analyzer")}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <div className="relative z-10">
-              <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+              <div className="w-16 h-16 bg-gradient-to-br from-rose-600 to-pink-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
                 <svg
                   className="w-8 h-8 text-white"
                   fill="none"
@@ -602,54 +623,18 @@ const Dashboard = ({ studentData, onLogout }) => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 713.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 713.138-3.138z"
+                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
                   />
                 </svg>
               </div>
-              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-green-400" : "text-gray-800 group-hover:text-green-700"}`}>
-                Academic Certificates
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-rose-400" : "text-gray-800 group-hover:text-rose-700"}`}>
+                AI Resume Analyzer
               </h3>
               <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
-                Manage and showcase your academic achievements
+                AI-powered resume analysis with real internship recommendations from top platforms
               </p>
-              <div className="mt-4 flex items-center text-green-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
-                <span className="text-sm">Manage →</span>
-              </div>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
-            onClick={() => navigate("/personal-achievements")}
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-            <div className="relative z-10">
-              <div className="w-16 h-16 bg-gradient-to-br from-yellow-600 to-orange-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                <svg
-                  className="w-8 h-8 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 713.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 713.138-3.138z"
-                  />
-                </svg>
-              </div>
-              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-orange-400" : "text-gray-800 group-hover:text-orange-700"}`}>
-                Personal Achievements
-              </h3>
-              <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
-                Track your personal certificates and accomplishments
-              </p>
-              <div className="mt-4 flex items-center text-orange-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
-                <span className="text-sm">View →</span>
+              <div className="mt-4 flex items-center text-rose-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
+                <span className="text-sm">Analyze →</span>
               </div>
             </div>
           </motion.div>
@@ -803,11 +788,11 @@ const Dashboard = ({ studentData, onLogout }) => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.8 }}
             className={`group backdrop-blur-2xl rounded-3xl shadow-xl p-8 border cursor-pointer hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 relative overflow-hidden ${dark ? "bg-white/[0.04] border-white/10 hover:bg-white/[0.08]" : "bg-white/60 border-white/30 hover:bg-white/80"}`}
-            onClick={() => navigate("/resume-analyzer")}
+            onClick={() => navigate("/academic-certificates")}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-pink-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/10 to-emerald-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
             <div className="relative z-10">
-              <div className="w-16 h-16 bg-gradient-to-br from-rose-600 to-pink-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
+              <div className="w-16 h-16 bg-gradient-to-br from-green-600 to-emerald-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform duration-300">
                 <svg
                   className="w-8 h-8 text-white"
                   fill="none"
@@ -818,18 +803,18 @@ const Dashboard = ({ studentData, onLogout }) => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                    d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 713.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 713.138-3.138z"
                   />
                 </svg>
               </div>
-              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-rose-400" : "text-gray-800 group-hover:text-rose-700"}`}>
-                AI Resume Analyzer
+              <h3 className={`text-xl font-bold mb-3 transition-colors ${dark ? "text-gray-200 group-hover:text-green-400" : "text-gray-800 group-hover:text-green-700"}`}>
+                Academic Certificates
               </h3>
               <p className={`leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
-                AI-powered resume analysis with real internship recommendations from top platforms
+                Manage and showcase your academic achievements
               </p>
-              <div className="mt-4 flex items-center text-rose-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
-                <span className="text-sm">Analyze →</span>
+              <div className="mt-4 flex items-center text-green-600 font-medium group-hover:translate-x-2 transition-transform duration-300">
+                <span className="text-sm">Manage →</span>
               </div>
             </div>
           </motion.div>

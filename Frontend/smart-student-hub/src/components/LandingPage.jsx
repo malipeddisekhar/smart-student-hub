@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import api from "../services/api";
+import HowItWorks from "./HowItWorks";
 
 const LandingPage = () => {
   const navigate = useNavigate();
@@ -113,17 +114,17 @@ const LandingPage = () => {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
-              className="flex items-center space-x-2"
+              className="flex items-center space-x-1.5 sm:space-x-2"
             >
               <button
                 onClick={() => navigate("/login")}
-                className="btn-ripple bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium"
+                className="btn-ripple bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium"
               >
                 Student
               </button>
               <button
                 onClick={() => navigate("/leaderboard")}
-                className="btn-ripple bg-blue-100 hover:bg-blue-200 text-blue-700 px-4 py-2 rounded-xl text-sm font-medium shadow-md"
+                className="btn-ripple bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium shadow-md"
               >
                 Leaderboard
               </button>
@@ -160,8 +161,8 @@ const LandingPage = () => {
                 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-slate-900 mb-7 leading-[1.05] tracking-tight"
                 style={{ fontFamily: "Poppins, Inter, system-ui, -apple-system, sans-serif" }}
               >
-                Centralized Digital Platform for
-                <span className="block mt-2 hero-highlight-text">Smart Student Hub</span>
+                AI Powered Academic & Career Growth Platform
+                {/* <span className="block mt-2 hero-highlight-text">Smart Student Hub</span> */}
               </motion.h1>
 
               <motion.p
@@ -315,6 +316,12 @@ const LandingPage = () => {
                 >
                   Teacher Login
                 </button>
+                  <button
+                  onClick={() => navigate("/admin/login")}
+                  className="w-full sm:w-auto btn-ripple hero-login-btn text-white px-7 py-3.5 rounded-2xl text-base font-semibold"
+                >
+                  Admin Login
+                </button>
               </motion.div>
             </div>
 
@@ -358,6 +365,9 @@ const LandingPage = () => {
           </div>
         </div>
       </section>
+
+      {/* How It Works Section */}
+      <HowItWorks />
 
       {/* Feature Blocks */}
       <section className="py-20 relative">
@@ -563,22 +573,25 @@ const LandingPage = () => {
                 Smart Student Hub
               </h3>
               <p className="text-gray-400 text-xs md:text-sm">
-                Smart India Hackathon 2025 - Problem Statement #25093
+                Smart Student Hub @ All rights reserved. Designed and developed by the Error Squad x Team.
               </p>
             </div>
             <div className="flex flex-wrap gap-4 md:gap-6">
-              {["Privacy Policy", "Terms of Service"].map((link) => (
-                <a
-                  key={link}
-                  href="#"
-                  className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm"
-                >
-                  {link}
-                </a>
-              ))}
+              <button
+                onClick={() => navigate("/privacy")}
+                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm cursor-pointer"
+              >
+                Privacy Policy
+              </button>
+              <button
+                onClick={() => navigate("/terms")}
+                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm cursor-pointer"
+              >
+                Terms of Service
+              </button>
               <button
                 onClick={() => navigate("/contact")}
-                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm"
+                className="text-gray-400 hover:text-white transition-colors duration-200 text-xs md:text-sm cursor-pointer"
               >
                 Contact
               </button>

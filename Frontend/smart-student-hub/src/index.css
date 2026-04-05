@@ -826,3 +826,67 @@ button, a, input, select, textarea {
     height: 180px;
   }
 }
+
+/* ==================== MOBILE RESPONSIVE UTILITIES ==================== */
+
+/* Scrollbar-hide utility for tab bars */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Prevent any container from causing horizontal overflow */
+@media (max-width: 767px) {
+  .container {
+    max-width: 100%;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  /* Ensure all images are contained */
+  img {
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Fix tables overflowing on mobile */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent pre/code blocks from overflowing */
+  pre, code {
+    max-width: 100%;
+    overflow-x: auto;
+    word-break: break-word;
+  }
+
+  /* Tighter border-radius on mobile for hero shell */
+  .hero-future-shell {
+    border-radius: 1.2rem;
+  }
+
+  /* Reduce stats shell spacing */
+  .stats-shell {
+    padding: 1.2rem 0.6rem;
+    border-radius: 1.2rem;
+  }
+
+  /* Footer adjustments */
+  .footer-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+  }
+}
+
+/* Tablet tweaks */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .footer-kpis {
+    gap: 0.6rem;
+  }
+}

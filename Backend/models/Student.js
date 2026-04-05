@@ -10,34 +10,6 @@ const generateStudentId = (college) => {
   return initials + randomStr;
 };
 
-const personalCertificateSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true
-  },
-  image: {
-    type: String,
-    required: true
-  },
-  url: {
-    type: String
-  },
-  date: {
-    type: Date,
-    required: true
-  },
-  category: {
-    type: String,
-    required: true
-  },
-  issuer: {
-    type: String,
-    required: true
-  }
-}, {
-  timestamps: true
-});
-
 const academicCertificateSchema = new mongoose.Schema({
   domain: {
     type: String,
@@ -210,7 +182,6 @@ const studentSchema = new mongoose.Schema({
     currentSGPA: { type: Number, default: 0 },
     overallCGPA: { type: Number, default: 0 }
   },
-  personalCertificates: { type: [personalCertificateSchema], default: [] },
   academicCertificates: { type: [academicCertificateSchema], default: [] },
   projects: { type: [projectSchema], default: [] },
   skills: {
