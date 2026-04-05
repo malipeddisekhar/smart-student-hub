@@ -2,7 +2,7 @@
 
 > An intelligent, comprehensive platform designed to revolutionize academic workflows, streamline certificate verification, and accelerate career growth for students, faculty, and administrators.
 
-**[🌐 Live Website](https://smart-student-hub.me)** | **[📝 GitHub Repository](https://github.com/malipeddisekhar/smart-student-hub)** | **[🔗 Source Repository](https://github.com/DurgaPrasadKattunga/sih-smart-student-hub)**
+**[🌐 Live Website](https://smart-student-hub.me)** | **[📝 GitHub Repository](https://github.com/malipeddisekhar/smart-student-hub)**
 
 ---
 
@@ -520,7 +520,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## 👥 Acknowledgments
 
-- **Durga Prasad Kattunga** - Original Project Lead
+- **Malipeddi Sekhar** - Main Developer & Project Lead
 - **Team Contributors** - All developers and testers
 - **Smart India Hackathon (SIH)** - For the opportunity and inspiration
 - **GMRIT** - Supporting Institution
