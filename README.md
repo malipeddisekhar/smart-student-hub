@@ -241,8 +241,8 @@ Password: satish11
 
 #### Login System
 ```
-Email:    adminsekhar@gmail.com
-Password: admin
+Email:    ===============
+Password: *************
 ```
 
 #### 🔧 **Admin Capabilities**
